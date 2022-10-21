@@ -71,8 +71,21 @@ def constructo_col(filename):
     return (C, seqn, bwt, sa)
 
 def rl_encode(C: [int], R: [int]) -> ([int], [int]):
-    # TODO: Alessia
-    pass
+    
+    t_row=R[0]
+    curr_c=C[0]
+    rle_C=[]
+    for i in range(1,len(C)):
+        if C[i]!=curr_c:
+            rle_C.append((curr_c,t_row))
+            rle_C.append((curr_c,R[i-1]))
+            curr_c=C[i]
+            t_row=R[i]
+            
+    rle_C.append((curr_c,t_row))
+    rle_C.append((curr_c,R[-1]))
+    
+    return rle_C
 
 def rindex_query(T: str, P: str) -> int:
     # TODO: Andy
