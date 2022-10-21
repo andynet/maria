@@ -2,14 +2,6 @@ from Bio import SeqIO
 import numpy as np
 from pydivsufsort import divsufsort
 
-'''
-def genereta_sa(s):
-    suffixes = [(s[i:], i) for i in range(len(s))]
-    suffixes = sorted(suffixes, key=lambda x: x[0])
-    sa = [suffixes[i][1] for i in range(len(s))]
-    return sa
-'''
-
 def parese_msa(filename):
     pos_to_col = {}
     fasta_sequences = SeqIO.parse(open(filename),'fasta')
@@ -43,15 +35,12 @@ def finfSeqn(EP,p):
         if EP[u]>p:
             return u-1
 
-
-#s, sa, pos_to_col
-
 def constructo_col(filename):
     fasta_sequences = SeqIO.parse(open(filename),'fasta')
     msa=[]
     for i in fasta_sequences:
         msa.append(str(i.seq))
-    
+
     T='$'.join(msa).replace('-','')+'$#'
     #sa=genereta_sa(T)
     sa=list(divsufsort(T))
@@ -59,7 +48,7 @@ def constructo_col(filename):
     for i in range(len(T)):
         if T[i] == '$':
             EP.append(i+1)
-    
+
 
     P=[]
     seqn=[]
@@ -69,7 +58,7 @@ def constructo_col(filename):
         bwt+=T[p]
         P.append(findP(EP,p))
         seqn.append(finfSeqn(EP,p))
-    
+
     C=[]
     psot_clo=parese_msa_bis(msa)
     for i in range(len(T)):
@@ -77,21 +66,42 @@ def constructo_col(filename):
             C.append(len(msa)+1)
             continue
         C.append(psot_clo[(seqn[i],P[i])])
-    
+
     #print(C)
-    return C,bwt
+    return (C, seqn, bwt, sa)
 
+def rl_encode(C: [int], R: [int]) -> ([int], [int]):
+    # TODO: Alessia
+    pass
 
+def rindex_query(T: str, P: str) -> int:
+    # TODO: Andy
+    pass
 
-C,bwt = constructo_col('mul_aln_meningitidis.5.fa')
+def lce(T: str, i: int, j: int) -> (int, bool):
+    # TODO: Andy
+    pass
 
-with open('col.txt','w') as col:
-    for i in C:
-        col.write(str(i)+'\n')
+def binsearch(occ1: int, rle_C: ([int], [int]), T: str, upper: bool):
+    # TODO: Goobi
+    pass
 
-with open('bwt.txt','w') as BWT:
-    for i in bwt:
-        BWT.write(i+'\n')
+def doc_listing(C: [int], i: int, j: int) -> [int]:
+    # TODO: Andy
+    pass
 
+def get_cols(occ1: int, rle_C: ([int], [int]), T: str) -> [int]:
+    upper = binsearch(occ1, rle_C, T, True)     # upper=True
+    lower = binsearch(occ1, rle_C, T, False)    # upper=False
+    C, R = rle_C
+    return doc_listing(C, upper, lower)
 
-#parese_msa("multiple_aln_phages.fasta")
+def search(T: str, P: str) -> list[int]:
+    C, R, bwt, sa = constructo_col('mul_aln_meningitidis.5.fa') # TODO: return sa
+    rle_C = rl_encode(C, R)
+
+    occ1 = rindex_query(T, P)
+    cols = get_cols(occ1, rle_C, T)
+
+if __name__ == '__main__':
+    pass
