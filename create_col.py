@@ -23,12 +23,14 @@ def find_row(EP, p):
         if EP[u]>p:
             return u-1
 
-def construct_col(filename):
+def load_msa(filename):
     fasta_sequences = SeqIO.parse(open(filename),'fasta')
     msa=[]
     for i in fasta_sequences:
         msa.append(str(i.seq))
+    return msa
 
+def construct_col(msa):
     T='$'.join(msa).replace('-','')+'$#'
     #sa=genereta_sa(T)
     sa=list(divsufsort(T))
@@ -57,8 +59,20 @@ def construct_col(filename):
     return (C, seqn, bwt, sa)
 
 def rl_encode(C: [int], R: [int]) -> ([int], [int]):
-    # TODO: Alessia
-    pass
+    new_C = [C[0]]
+    new_R = [R[0]]
+
+    for i in range(1, len(C)):
+        if C[i] != new_C[-1]:
+            new_C.append(C[i-1])
+            new_R.append(R[i-1])
+            new_C.append(C[i])
+            new_R.append(R[i])
+
+    new_C.append(C[-1])
+    new_R.append(R[-1])
+
+    return (new_C, new_R)
 
 def rindex_query(T: str, P: str) -> int:
     n = len(T)
@@ -100,11 +114,17 @@ def get_cols(occ1: int, rle_C: ([int], [int]), T: str) -> [int]:
     return doc_listing(C, upper, lower)
 
 def search(T: str, P: str) -> list[int]:
-    C, R, bwt, sa = construct_col('mul_aln_meningitidis.5.fa') # TODO: return sa
+    pass
+
+if __name__ == '__main__':
+    filename = 'data/test.fa'
+    msa = load_msa(filename)
+
+    T='$'.join(msa).replace('-','')+'$#'
+    P='AT'
+
+    C, R, bwt, sa = construct_col(msa)
     rle_C = rl_encode(C, R)
 
     occ1 = rindex_query(T, P)
-    cols = get_cols(occ1, rle_C, T)
-
-if __name__ == '__main__':
-    pass
+    # cols = get_cols(occ1, rle_C, T)
