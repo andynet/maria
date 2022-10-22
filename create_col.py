@@ -75,20 +75,37 @@ def rl_encode(C: [int], R: [int]) -> ([int], [int]):
     pass
 
 def rindex_query(T: str, P: str) -> int:
-    # TODO: Andy
-    pass
+    n = len(T)
+    m = len(P)
+    for i in range(n-m):
+        j = 0
+        while j < m and T[i+j] == P[j]:
+            j += 1
+        if j == m:
+            return i
+    return -1
 
 def lce(T: str, i: int, j: int) -> (int, bool):
-    # TODO: Andy
-    pass
+    n = len(T)
+    k = 0
+    while i+k < n and j+k < n and T[i+k] == T[j+k]:
+        k += 1
+    if i+k >= n:        return (k, True)    # suffix Ti ends sooner
+    if j+k >= n:        return (k, False)   # suffix Tj ends sooner
+    if T[i+k] < T[j+k]: return (k, True)    # suffix Ti < suffix Tj
+    if T[j+k] < T[i+k]: return (k, False)   # suffix Tj < suffix Ti
+
+    print("I should never end here.")
 
 def binsearch(occ1: int, rle_C: ([int], [int]), T: str, upper: bool):
     # TODO: Goobi
     pass
 
 def doc_listing(C: [int], i: int, j: int) -> [int]:
-    # TODO: Andy
-    pass
+    res = [C[i]]
+    for k in range(i+1,j):
+        if C[k-1] != C[k]: res.append(C[k])
+    return res
 
 def get_cols(occ1: int, rle_C: ([int], [int]), T: str) -> [int]:
     upper = binsearch(occ1, rle_C, T, True)     # upper=True
@@ -104,4 +121,18 @@ def search(T: str, P: str) -> list[int]:
     cols = get_cols(occ1, rle_C, T)
 
 if __name__ == '__main__':
-    pass
+    T = "ABBAABBABABABABBABA"
+    P = "BABA"
+    pos = rindex_query(T, P)
+    print(pos)
+    i, j = 3, 11
+    print(T[i:])
+    print(T[j:])
+    (lenght, sign) = lce(T, i, j)
+    print(lenght, sign)
+
+    i, j = 3, 15
+    l = [4,4,5,5,5,5,7,8,8,4,4,8,8,8,8,8,8,1,1]
+    cols = doc_listing(l, i, j)
+    print(l[i:j])
+    print(cols)
