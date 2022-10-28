@@ -1,3 +1,4 @@
+import sys
 from Bio import SeqIO
 import numpy as np
 from pydivsufsort import divsufsort
@@ -12,6 +13,16 @@ def parse_msa(msa):
                 pos_to_col[(i,pos)]=j
                 pos+=1
     return pos_to_col
+
+def map_msa_to_T(msa):
+    msa_to_T={}
+    pos=0
+    for i in range(len(msa)):
+        for j in range(len(msa[i])):
+            if msa[i][j] != '-':
+                msa_to_T[(i,j)] = pos
+                pos+=1
+    return map_msa_to_T(msa)
 
 def find_P(EP, p):
     for i in range(len(EP)):
@@ -56,7 +67,7 @@ def construct_col(msa):
             continue
         C.append(pos_to_col[(seqn[i],P[i])])
 
-    return (C, seqn, bwt, sa)
+    return (C, seqn, bwt, sa, pos_to_col)
 
 def rl_encode(C: [int], R: [int]) -> ([int], [int]):
     new_C = [C[0]]
@@ -97,9 +108,51 @@ def lce(T: str, i: int, j: int) -> (int, bool):
 
     print("I should never end here.")
 
-def binsearch(occ1: int, rle_C: ([int], [int]), T: str, upper: bool):
-    # TODO: Goobi
-    pass
+
+def check(len1: int, rle_C: ([int], [int]), T: str, msa2t: dict[int, int], upper: bool, middle: int, offset: int) -> bool:
+    pos_act, pos_prev = msa2t(middle), msa2t(middle+offset)
+    offset_lce = lce(T, pos_prev, occ1)[0]
+    middle_lce = lce(T, pos_act, occ1)[0]
+    offset_sign = lce(T, pos_prev, occ1)[1]
+    middle_sign = lce(T, pos_act, occ1)[1]
+    if middle_lce >= len1 and offset_lce < len1:
+        return "done"
+    if upper: # might wanna convert this to a switch case
+        if middle_lce == offset_lce and middle_sign:
+            return "down"
+        elif (middle_lce >= len1) or (not middle_sign):
+            return "up"
+        else:
+            print("I should not end up here", file=sys.stderr)
+            return "up"
+    else:
+        if middle_lce == offset_lce and (not middle_sign):
+            return "up"
+        elif (middle_lce >= len1) or middle_sign:
+            return "down"
+        else:
+            print("I should not end up here", file=sys.stderr)
+            return "up"
+    print("I should not end up here", file=sys.stderr)
+    return "up"
+
+def binsearch(occ1: int, len1: int, rle_C: ([int], [int]), T: str, msa2t: dict[int, int], upper: bool) -> int:
+    # we represent the half-open interval <start, end)
+    N = len(rle_C)
+    start, end, offset  = 1, N, -1
+    if not upper:
+        start, end, offset = 0, N-1, 1
+    middle = None
+    while start < end:
+        middle = (end - start)//2
+        res = check(len1, rle_C, T, msa2t, upper, middle, offset)
+        if res == "done":
+            break
+        elif res == "down":
+            end = middle + 1
+        else:
+            start = middle
+    return middle
 
 def doc_listing(C: [int], i: int, j: int) -> [int]:
     res = [C[i]]
@@ -107,9 +160,10 @@ def doc_listing(C: [int], i: int, j: int) -> [int]:
         if C[k-1] != C[k]: res.append(C[k])
     return res
 
-def get_cols(occ1: int, rle_C: ([int], [int]), T: str) -> [int]:
-    upper = binsearch(occ1, rle_C, T, True)     # upper=True
-    lower = binsearch(occ1, rle_C, T, False)    # upper=False
+def get_cols(occ1: int, len1: int, rle_C: ([int], [int]), T: str, msa: [[char]]) -> [int]:
+    msa2t = msa_to_T(msa)
+    upper = binsearch(occ1, len1, rle_C, T, msa2t, True)     # upper=True
+    lower = binsearch(occ1, len1, rle_C, T, msa2t, False)    # upper=False
     C, R = rle_C
     return doc_listing(C, upper, lower)
 
@@ -123,8 +177,11 @@ if __name__ == '__main__':
     T='$'.join(msa).replace('-','')+'$#'
     P='AT'
 
-    C, R, bwt, sa = construct_col(msa)
+    C, R, bwt, sa, pos_to_col = construct_col(msa)
     rle_C = rl_encode(C, R)
 
     occ1 = rindex_query(T, P)
-    # cols = get_cols(occ1, rle_C, T)
+    cols = get_cols(occ1, len(P), rle_C, T, pos_to_col)
+
+if __name__ == '__main__':
+    pass
