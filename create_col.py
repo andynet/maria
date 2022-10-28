@@ -15,14 +15,17 @@ def parse_msa(msa):
     return pos_to_col
 
 def map_msa_to_T(msa):
-    msa_to_T={}
-    pos=0
+    msa_to_T = {}
+    pos = 0
     for i in range(len(msa)):
+        col = 0
+        msa[i] += '$'
         for j in range(len(msa[i])):
             if msa[i][j] != '-':
-                msa_to_T[(i,j)] = pos
-                pos+=1
-    return map_msa_to_T(msa)
+                msa_to_T[(i,col)] = pos
+                col += 1
+                pos += 1
+    return msa_to_T
 
 def find_P(EP, p):
     for i in range(len(EP)):
@@ -67,7 +70,7 @@ def construct_col(msa):
             continue
         C.append(pos_to_col[(seqn[i],P[i])])
 
-    return (C, seqn, bwt, sa, pos_to_col)
+    return (C, seqn, bwt, sa)
 
 def rl_encode(C: [int], R: [int]) -> ([int], [int]):
     new_C = [C[0]]
@@ -109,11 +112,11 @@ def lce(T: str, i: int, j: int) -> (int, bool):
     print("I should never end here.")
 
 
-def check(len1: int, rle_C: ([int], [int]), T: str, msa2t: dict[int, int], upper: bool, middle: int, offset: int) -> bool:
-    pos_act, pos_prev = msa2t(middle), msa2t(middle+offset)
-    offset_lce = lce(T, pos_prev, occ1)[0]
+def check(occ1: int, len1: int, rle_C: ([int], [int]), T: str, msa2t: dict[int, int], upper: bool, middle: int, offset: int) -> bool:
+    pos_act, pos_off = msa2t[ (rle_C[1][middle], rle_C[0][middle]) ], msa2t[ (rle_C[1][middle+offset], rle_C[0][middle+offset]) ]
+    offset_lce = lce(T, pos_off, occ1)[0]
     middle_lce = lce(T, pos_act, occ1)[0]
-    offset_sign = lce(T, pos_prev, occ1)[1]
+    offset_sign = lce(T, pos_off, occ1)[1]
     middle_sign = lce(T, pos_act, occ1)[1]
     if middle_lce >= len1 and offset_lce < len1:
         return "done"
@@ -138,20 +141,20 @@ def check(len1: int, rle_C: ([int], [int]), T: str, msa2t: dict[int, int], upper
 
 def binsearch(occ1: int, len1: int, rle_C: ([int], [int]), T: str, msa2t: dict[int, int], upper: bool) -> int:
     # we represent the half-open interval <start, end)
-    N = len(rle_C)
+    N = len(rle_C[0])
     start, end, offset  = 1, N, -1
     if not upper:
         start, end, offset = 0, N-1, 1
     middle = None
     while start < end:
         middle = (end - start)//2
-        res = check(len1, rle_C, T, msa2t, upper, middle, offset)
+        res = check(occ1, len1, rle_C, T, msa2t, upper, middle, offset)
         if res == "done":
             break
-        elif res == "down":
-            end = middle + 1
+        elif res == "up":
+            end = middle
         else:
-            start = middle
+            start = middle + 1
     return middle
 
 def doc_listing(C: [int], i: int, j: int) -> [int]:
@@ -160,8 +163,8 @@ def doc_listing(C: [int], i: int, j: int) -> [int]:
         if C[k-1] != C[k]: res.append(C[k])
     return res
 
-def get_cols(occ1: int, len1: int, rle_C: ([int], [int]), T: str, msa: [[char]]) -> [int]:
-    msa2t = msa_to_T(msa)
+def get_cols(occ1: int, len1: int, rle_C: ([int], [int]), T: str, msa: [[chr]]) -> [int]:
+    msa2t = map_msa_to_T(msa)
     upper = binsearch(occ1, len1, rle_C, T, msa2t, True)     # upper=True
     lower = binsearch(occ1, len1, rle_C, T, msa2t, False)    # upper=False
     C, R = rle_C
@@ -177,11 +180,11 @@ if __name__ == '__main__':
     T='$'.join(msa).replace('-','')+'$#'
     P='AT'
 
-    C, R, bwt, sa, pos_to_col = construct_col(msa)
+    C, R, bwt, sa = construct_col(msa)
     rle_C = rl_encode(C, R)
 
     occ1 = rindex_query(T, P)
-    cols = get_cols(occ1, len(P), rle_C, T, pos_to_col)
+    cols = get_cols(occ1, len(P), rle_C, T, msa)
 
 if __name__ == '__main__':
     pass
