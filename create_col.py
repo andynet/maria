@@ -16,15 +16,16 @@ def parse_msa(msa):
 
 def map_msa_to_T(msa):
     msa_to_T = {}
+    N = len(msa)
     pos = 0
-    for i in range(len(msa)):
+    for i in range(N):
         col = 0
-        msa[i] += '$'
         for j in range(len(msa[i])):
             if msa[i][j] != '-':
                 msa_to_T[(i,col)] = pos
                 col += 1
                 pos += 1
+    msa_to_T[ (N-1, len(msa[N-1])-1) ] = pos # the \# value at the end of T
     return msa_to_T
 
 def find_P(EP, p):
@@ -112,7 +113,7 @@ def lce(T: str, i: int, j: int) -> (int, bool):
     print("I should never end here.")
 
 
-def check(occ1: int, len1: int, rle_C: ([int], [int]), T: str, msa2t: dict[int, int], upper: bool, middle: int, offset: int) -> bool:
+def check(occ1: int, len1: int, rle_C: ([int], [int]), T: str, msa2t: dict, upper: bool, middle: int, offset: int) -> str:
     pos_act, pos_off = msa2t[ (rle_C[1][middle], rle_C[0][middle]) ], msa2t[ (rle_C[1][middle+offset], rle_C[0][middle+offset]) ]
     offset_lce = lce(T, pos_off, occ1)[0]
     middle_lce = lce(T, pos_act, occ1)[0]
@@ -120,10 +121,12 @@ def check(occ1: int, len1: int, rle_C: ([int], [int]), T: str, msa2t: dict[int, 
     middle_sign = lce(T, pos_act, occ1)[1]
     if middle_lce >= len1 and offset_lce < len1:
         return "done"
+    if (middle_lce == offset_lce) and (middle_sign ^ offset_sign): # middle_sign != offset sign, the boundary is in the middle of the run
+        return "done"
     if upper: # might wanna convert this to a switch case
-        if middle_lce == offset_lce and middle_sign:
+        if middle_lce == offset_lce and middle_sign: # before the LCE interval
             return "down"
-        elif (middle_lce >= len1) or (not middle_sign):
+        elif (middle_lce >= len1) or (not middle_sign): # after the LCE interval
             return "up"
         else:
             print("I should not end up here", file=sys.stderr)
@@ -139,7 +142,38 @@ def check(occ1: int, len1: int, rle_C: ([int], [int]), T: str, msa2t: dict[int, 
     print("I should not end up here", file=sys.stderr)
     return "up"
 
-def binsearch(occ1: int, len1: int, rle_C: ([int], [int]), T: str, msa2t: dict[int, int], upper: bool) -> int:
+def has_boundary(occ1: int, len1: int, rle_C: ([int], [int]), T: str, msa2t: dict, upper: bool, i: int, offset: int) -> str:
+    pos_top, pos_bot = msa2t[ (rle_C[1][i], rle_C[0][i]) ], msa2t[ (rle_C[1][i+offset], rle_C[0][i+offset]) ]
+    bot_lce = lce(T, pos_bot, occ1)[0]
+    bot_sign = lce(T, pos_bot, occ1)[1]
+    top_lce = lce(T, pos_top, occ1)[0]
+    top_sign = lce(T, pos_top, occ1)[1]
+    
+    if (top_lce == bot_lce) and (top_sign ^ bot_sign):
+        return "done"
+    if upper:
+        if top_lce < len1 and bot_lce >= len1:
+            return "done"
+        else:
+            return "nope"
+    else:
+        if top_lce >= len1 and bot_lce < len1:
+            return "done"
+        else:
+            return "nope"
+
+def linsearch(occ1: int, len1: int, rle_C: ([int], [int]), T: str, msa2t: dict, upper: bool) -> int:
+    N = len(rle_C[0])
+    start, end, offset  = 1, N, -1
+    if not upper:
+        start, end, offset = 0, N-1, 1
+    for i in range(start, end):
+        res = has_boundary(occ1, len1, rle_C, T, msa2t, upper, i, offset)
+        if res == "done":
+            return i + int(not upper)
+    print("I should not end up here", file=sys.stderr)
+
+def binsearch(occ1: int, len1: int, rle_C: ([int], [int]), T: str, msa2t: dict, upper: bool) -> int:
     # we represent the half-open interval <start, end)
     N = len(rle_C[0])
     start, end, offset  = 1, N, -1
@@ -165,12 +199,12 @@ def doc_listing(C: [int], i: int, j: int) -> [int]:
 
 def get_cols(occ1: int, len1: int, rle_C: ([int], [int]), T: str, msa: [[chr]]) -> [int]:
     msa2t = map_msa_to_T(msa)
-    upper = binsearch(occ1, len1, rle_C, T, msa2t, True)     # upper=True
-    lower = binsearch(occ1, len1, rle_C, T, msa2t, False)    # upper=False
+    boundary_upper = linsearch(occ1, len1, rle_C, T, msa2t, True)     # upper=True
+    boundary_lower = linsearch(occ1, len1, rle_C, T, msa2t, False)    # upper=False
     C, R = rle_C
-    return doc_listing(C, upper, lower)
+    return doc_listing(C, boundary_upper, boundary_lower)
 
-def search(T: str, P: str) -> list[int]:
+def search(T: str, P: str) -> list:
     pass
 
 if __name__ == '__main__':
@@ -178,7 +212,7 @@ if __name__ == '__main__':
     msa = load_msa(filename)
 
     T='$'.join(msa).replace('-','')+'$#'
-    P='AT'
+    P='G'
 
     C, R, bwt, sa = construct_col(msa)
     rle_C = rl_encode(C, R)
