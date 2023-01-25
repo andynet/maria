@@ -123,8 +123,17 @@ if __name__ == '__main__':
     T='$'.join(msa).replace('-','')+'$#'
     P='AT'
 
+    print(T)
+
     C, R, bwt, sa = construct_col(msa)
     rle_C = rl_encode(C, R)
+
+    for i in range(len(C)):
+        print(C[i], R[i], T[sa[i]:])
+
+    print()
+    for i in range(len(rle_C[0])):
+        print(rle_C[0][i], rle_C[1][i])
 
     occ1 = rindex_query(T, P)
     # cols = get_cols(occ1, rle_C, T)
