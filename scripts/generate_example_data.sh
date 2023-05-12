@@ -24,5 +24,6 @@ gunzip SARS-CoV2.5.fna.gz
 iss generate --genomes SARS-CoV2.5.fna --n_reads 10 --model HiSeq --output reads
 ../../tools/moni-0.2.0-Linux/bin/moni build -f -r SARS-CoV2.5.fna -o index
 ../../tools/moni-0.2.0-Linux/bin/moni mems -i index -p reads_R1.fastq -o mems
+../../tools/moni-0.2.0-Linux/bin/moni ms -i index -p reads_R1.fastq -o reads_R1
 cargo run SARS-CoV2.5.gfa > tags.txt
 
