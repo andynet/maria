@@ -229,5 +229,3 @@ if __name__ == '__main__':
     occ1 = rindex_query(T, P)
     cols = get_cols(occ1, len(P), rle_C, T, msa)
 
-if __name__ == '__main__':
-    pass
