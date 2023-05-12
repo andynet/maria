@@ -1,5 +1,3 @@
-data/*
-!data/test.fa
 __pycache__/
 /target
 Cargo.lock
