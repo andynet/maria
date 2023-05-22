@@ -10,7 +10,7 @@ use std::fmt;
 use std::fs::File;
 use std::io::BufReader;
 use std::io::prelude::*;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 // use std::io::prelude::*;
 
 /// Find MEMs in a graph
@@ -28,7 +28,7 @@ struct Args {
     ptr_filename: String,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone)]
 struct GraphPos {
     node_id: Vec<u8>,
     pos: usize,
@@ -136,9 +136,19 @@ fn get_mems(mems: &str, ptrs: &str) -> Vec<(usize, usize)> {
     return res;
 }
 
+fn list_unique(tag: &[GraphPos]) -> Vec<GraphPos> {
+    let mut set: HashSet<GraphPos> = HashSet::new();
+    for i in 0..tag.len() { set.insert(tag[i].clone()); }
+    let mut res = Vec::new();
+    for item in set { res.push(item); }
+    return res;
+}
+
 fn get_graph_positions(seq: &[u8], mem: &(usize, usize), tag: &[GraphPos], sa: &[usize]) -> Vec<GraphPos> {
-    println!("{}", str::from_utf8(&seq[mem.0..mem.0+mem.1]).unwrap());
-    return Vec::new();
+    let lower = 0;          // included
+    let upper = 10;  // excluded
+
+    return list_unique(&tag[lower..upper]);
 }
 
 fn main() {
