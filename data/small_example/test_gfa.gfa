@@ -1,0 +1,17 @@
+H	VN:Z:1.1
+S	0	AGCTAA
+S	1	GTGC
+S	2	TAGAT
+S	3	GTGT
+S	4	ACAA
+P	x	0+,1+,2+,3+,4+	*
+L	0	+	1	+	0M
+L	1	+	2	+	0M
+L	2	+	3	+	0M
+L	3	+	4	+	0M
+P	y	0+,2-,1-,3+,2+,4+	*
+L	0	+	2	-	0M
+L	2	-	1	-	0M
+L	1	-	3	+	0M
+L	3	+	2	+	0M
+L	2	+	4	+	0M
