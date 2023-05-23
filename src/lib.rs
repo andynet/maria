@@ -84,19 +84,23 @@ pub fn tag_array<N: SegmentId, T: OptFields>(
     return tag;
 }
 
-pub fn create_sequence<N: SegmentId, T: OptFields>(
-    paths: &[Path<N, T>],
-    map: &HashMap<Vec<u8>, Vec<u8>>
-) -> Vec<u8> {
+pub fn create_sequence<N, T>(paths: &[Path<N, T>], map: &HashMap<Vec<u8>, Vec<u8>>) 
+    -> (Vec<u8>, Vec<usize>)
+where
+    N: SegmentId,
+    T: OptFields
+{
     let mut seq = Vec::new();
+    let mut lengths = Vec::new();
     for p in paths {
         let segments = parse_segments(&p.segment_names);
         let sequence = get_sequence(&segments, &map);
 
         seq.extend_from_slice(&sequence);
+        lengths.push(seq.len());
         seq.push(b'$');
     }
-    return seq;
+    return (seq, lengths);
 }
 
 pub fn create_map<N, T>(segments: &[Segment<N, T>]) -> HashMap<N, Vec<u8>>
@@ -138,7 +142,7 @@ mod tests {
         println!("{}", str::from_utf8(&version).unwrap());
 
         let map = create_map(&gfa.segments);
-        let seq = create_sequence(&gfa.paths, &map);
+        let (seq, _) = create_sequence(&gfa.paths, &map);
         println!("{}", str::from_utf8(&seq).unwrap());
 
         let sa  = suffix_array(&seq);
@@ -156,7 +160,7 @@ mod tests {
         let gfa = parser.parse_file(FILE).expect("Error parsing file.");
 
         let map = create_map(&gfa.segments);
-        let seq = create_sequence(&gfa.paths, &map);
+        let (seq, _) = create_sequence(&gfa.paths, &map);
 
         let sa  = suffix_array(&seq);
         let isa = inverse_suffix_array(&sa);

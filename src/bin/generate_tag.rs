@@ -25,7 +25,7 @@ fn main() {
     let gfa = parser.parse_file(args.file_name).expect("Error parsing file.");
 
     let map = create_map(&gfa.segments);
-    let seq = create_sequence(&gfa.paths, &map);
+    let (seq, _) = create_sequence(&gfa.paths, &map);
 
     let sa  = suffix_array(&seq);
     let isa = inverse_suffix_array(&sa);

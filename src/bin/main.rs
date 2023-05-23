@@ -28,13 +28,19 @@ struct Args {
     ptr_filename: String,
 }
 
-#[derive(Debug, PartialEq, Eq, Hash, Clone)]
+#[derive(PartialEq, Eq, Hash, Clone)]
 struct GraphPos {
     node_id: Vec<u8>,
     pos: usize,
 }
 
 impl fmt::Display for GraphPos {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "({}, {})", str::from_utf8(&self.node_id).unwrap(), self.pos)
+    }
+}
+
+impl fmt::Debug for GraphPos {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "({}, {})", str::from_utf8(&self.node_id).unwrap(), self.pos)
     }
@@ -96,7 +102,7 @@ where
     return (tag_sample, sa_sample);
 }
 
-fn get_mems(mems: &str, ptrs: &str) -> Vec<(usize, usize)> {
+fn get_mems(mems: &str, ptrs: &str, lengths: &[usize]) -> Vec<(usize, usize)> {
     let mut res = Vec::new();
 
     let mem_file = File::open(mems).expect("Cannot open MEM file.");
@@ -119,9 +125,9 @@ fn get_mems(mems: &str, ptrs: &str) -> Vec<(usize, usize)> {
                 .map(|x| x.parse().expect("Cannot parse PTR")).collect();
 
             for mem in &mems {
-                // because corona, TODO: fix this
                 // ads +1 for every $ inserted to seq
-                let adj = ptrs[mem.0] / 29850;
+                let mut adj = 0;
+                while lengths[adj] < ptrs[mem.0] { adj += 1; }
                 res.push((ptrs[mem.0]+adj, mem.1));
 
             }
@@ -201,7 +207,7 @@ fn main() {
     let gfa = parser.parse_file(&args.gfa_filename).expect("Error parsing file.");
 
     let map = create_map(&gfa.segments);
-    let seq = create_sequence(&gfa.paths, &map); 
+    let (seq, lengths) = create_sequence(&gfa.paths, &map); 
     // ^- This is a problem, because it is linear size.
     // How to get rid of it?
 
@@ -209,7 +215,7 @@ fn main() {
     print_tag(&stag[..10]);
     println!("{:?}", &ssa[..10]);
 
-    let mems = get_mems(&args.mems_filename, &args.ptr_filename);
+    let mems = get_mems(&args.mems_filename, &args.ptr_filename, &lengths);
     println!("{:?}", mems);
 
     for mem in &mems {
