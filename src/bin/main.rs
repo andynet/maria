@@ -144,9 +144,52 @@ fn list_unique(tag: &[GraphPos]) -> Vec<GraphPos> {
     return res;
 }
 
+/// returns (l, f) such that: 
+/// seq[s1..s1+l] == seq[s2..s2+l]
+/// if seq[s1+l] < seq[s2+l]: f = True
+fn lce(seq: &[u8], s1: usize, s2: usize) -> (usize, bool) {
+    let n = seq.len();
+    if s1 == s2 { return (n-s1, false); }    // the same is not smaller
+
+    let mut l = 0;
+    while s1+l < n && s2+l < n && seq[s1+l] == seq[s2+l] { l += 1; }
+    if s1+l == n { return (l, true); }
+    if s2+l == n { return (l, false); }
+    if seq[s1+l] < seq[s2+l] { return (l, true); }
+    if seq[s1+l] > seq[s2+l] { return (l, false); }
+    panic!();
+}
+
+fn get_lower(seq: &[u8], mem: &(usize, usize), sa: &[usize]) -> usize {
+    let mut l = 0;
+    let mut r = sa.len();
+
+    while l < r-1 {
+        let m = (l + r - 1) / 2;
+        let (e, sa_smaller) = lce(seq, sa[m], mem.0);
+        if e < mem.1 && sa_smaller { l = m; }
+        else { r = m; }
+    }
+    return r;
+}
+
+fn get_upper(seq: &[u8], mem: &(usize, usize), sa: &[usize]) -> usize {
+    let mut l = 0;
+    let mut r = sa.len();
+
+    while l < r-1 {
+        let m = (l + r - 1) / 2;
+        let (e, sa_smaller) = lce(seq, sa[m], mem.0);
+        if e < mem.1 && !sa_smaller { r = m; }
+        else { l = m; }
+    }
+
+    return r;
+}
+
 fn get_graph_positions(seq: &[u8], mem: &(usize, usize), tag: &[GraphPos], sa: &[usize]) -> Vec<GraphPos> {
-    let lower = 0;          // included
-    let upper = 10;  // excluded
+    let lower = get_lower(seq, mem, sa);          // included
+    let upper = get_upper(seq, mem, sa);          // excluded
 
     return list_unique(&tag[lower..upper]);
 }
@@ -175,4 +218,33 @@ fn main() {
     }
 }
 
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_lce() {
+        let seq = b"AAAAAAAAAA$";
+        assert_eq!(lce(seq, 0, 5), (5, false));
+        let seq = b"AAAA$AAAA$";
+        assert_eq!(lce(seq, 0, 5), (5, false));
+        let seq = b"AGCTGCTGCTTGATGCTGATCG$";
+        assert_eq!(lce(seq, 1, 4), (6, true));
+        assert_eq!(lce(seq, 0, 0), (23, false));
+    }
+
+    #[test]
+    fn test_binsearch() {
+        let seq = b"AGGTTAGTAC$AGTAACGTTAAC$";
+        let mem = (17, 2);
+        let sa = suffix_array(seq);
+
+        let expected_result = (14, 18);
+        let lower = get_lower(seq, &mem, &sa);
+        let upper = get_upper(seq, &mem, &sa);
+
+        assert_eq!((lower, upper), expected_result);
+    }
+}
 
