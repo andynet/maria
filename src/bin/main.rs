@@ -11,7 +11,6 @@ use std::fs::File;
 use std::io::BufReader;
 use std::io::prelude::*;
 use std::collections::{HashMap, HashSet};
-// use std::io::prelude::*;
 
 /// Find MEMs in a graph
 #[derive(Parser, Debug)]
@@ -102,46 +101,6 @@ where
     return (tag_sample, sa_sample);
 }
 
-fn get_mems(mems: &str, ptrs: &str, lengths: &[usize]) -> Vec<(usize, usize)> {
-    let mut res = Vec::new();
-
-    let mem_file = File::open(mems).expect("Cannot open MEM file.");
-    let ptr_file = File::open(ptrs).expect("Cannot open PTR file.");
-
-    let mut mem_reader = BufReader::new(mem_file);
-    let mut ptr_reader = BufReader::new(ptr_file);
-
-    let mut mem_line = String::new();
-    let mut ptr_line = String::new();
-
-    let mut b1 = mem_reader.read_line(&mut mem_line).expect("Cannot read mem line.");
-    let mut b2 = ptr_reader.read_line(&mut ptr_line).expect("Cannot read ptr line.");
-
-    while b1 != 0 && b2 != 0 {
-        if !mem_line.starts_with(">") {
-            let mems: Vec<MEM> = mem_line.split_whitespace()
-                .map(|x| x.parse().expect("Cannot parse MEM")).collect();
-            let ptrs: Vec<usize> = ptr_line.split_whitespace()
-                .map(|x| x.parse().expect("Cannot parse PTR")).collect();
-
-            for mem in &mems {
-                // ads +1 for every $ inserted to seq
-                let mut adj = 0;
-                while lengths[adj] < ptrs[mem.0] { adj += 1; }
-                res.push((ptrs[mem.0]+adj, mem.1));
-
-            }
-        }
-
-        mem_line.clear();
-        ptr_line.clear();
-
-        b1 = mem_reader.read_line(&mut mem_line).expect("Cannot read mem line.");
-        b2 = ptr_reader.read_line(&mut ptr_line).expect("Cannot read ptr line.");
-    }
-    return res;
-}
-
 fn list_unique(tag: &[GraphPos]) -> Vec<GraphPos> {
     let mut set: HashSet<GraphPos> = HashSet::new();
     for i in 0..tag.len() { set.insert(tag[i].clone()); }
@@ -200,7 +159,15 @@ fn get_graph_positions(seq: &[u8], mem: &(usize, usize), tag: &[GraphPos], sa: &
     return list_unique(&tag[lower..upper]);
 }
 
+fn parse_node_id(node_id: Vec<u8>) -> (String, char) {
+    let n = node_id.len();
+    let id = str::from_utf8(&node_id[0..n-1]).unwrap().to_owned();
+    let sign = node_id[n-1] as char;
+    return (id, sign);
+}
+
 fn main() {
+    // <read_id> <read_pos> <ref_id> <ref_pos> <len> <node> <node_sign> <node_pos>
     let args = Args::parse();
 
     let parser: GFAParser<Vec<u8>, Vec<OptField>> = GFAParser::new();
@@ -212,15 +179,56 @@ fn main() {
     // How to get rid of it?
 
     let (stag, ssa) = get_sampled_arrays(&seq, &gfa.paths, &map);
-    print_tag(&stag[..10]);
-    println!("{:?}", &ssa[..10]);
 
-    let mems = get_mems(&args.mems_filename, &args.ptr_filename, &lengths);
-    println!("{:?}", mems);
+    let mem_file = File::open(&args.mems_filename).expect("Cannot open MEM file.");
+    let ptr_file = File::open(&args.ptr_filename).expect("Cannot open PTR file.");
 
-    for mem in &mems {
-        let gp: Vec<GraphPos> = get_graph_positions(&seq, &mem, &stag, &ssa);
-        println!("{:?}: {:?}", mem, gp);
+    let mut mem_reader = BufReader::new(mem_file);
+    let mut ptr_reader = BufReader::new(ptr_file);
+
+    let mut mem_line = String::new();
+    let mut ptr_line = String::new();
+
+    let mut b1 = mem_reader.read_line(&mut mem_line).expect("Cannot read mem line.");
+    let mut b2 = ptr_reader.read_line(&mut ptr_line).expect("Cannot read ptr line.");
+
+    let mut read_id = String::new();
+    while b1 != 0 && b2 != 0 {
+        if !mem_line.starts_with(">") {
+            let mems: Vec<MEM> = mem_line.split_whitespace()
+                .map(|x| x.parse().expect("Cannot parse MEM")).collect();
+            let ptrs: Vec<usize> = ptr_line.split_whitespace()
+                .map(|x| x.parse().expect("Cannot parse PTR")).collect();
+
+            for mem in &mems {
+                // ads +1 for every $ inserted to seq
+                let mut adj = 0;
+                while lengths[adj] < ptrs[mem.0] { adj += 1; }
+                let ref_mem = (ptrs[mem.0]+adj, mem.1);
+                let ref_pos;
+                if adj != 0 { ref_pos = ptrs[mem.0]+adj-lengths[adj-1]; }
+                else { ref_pos = ptrs[mem.0]; }
+
+                let gp: Vec<GraphPos> = get_graph_positions(&seq, &ref_mem, &stag, &ssa);
+
+                for gpos in gp {
+                    let (node_id, sign): (String, char) = parse_node_id(gpos.node_id);
+                    println!("{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}",
+                        read_id, mem.0, adj, ref_pos, mem.1, node_id, sign, gpos.pos
+                    )
+                }
+
+            }
+        } else {
+            read_id = mem_line.clone();
+            read_id = read_id.strip_prefix(">").unwrap().trim().to_owned();
+        }
+
+        mem_line.clear();
+        ptr_line.clear();
+
+        b1 = mem_reader.read_line(&mut mem_line).expect("Cannot read mem line.");
+        b2 = ptr_reader.read_line(&mut ptr_line).expect("Cannot read ptr line.");
     }
 }
 
