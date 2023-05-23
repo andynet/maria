@@ -165,7 +165,7 @@ fn get_lower(seq: &[u8], mem: &(usize, usize), sa: &[usize]) -> usize {
     let mut r = sa.len();
 
     while l < r-1 {
-        let m = (l + r - 1) / 2;
+        let m = (l + r) / 2;
         let (e, sa_smaller) = lce(seq, sa[m], mem.0);
         if e < mem.1 && sa_smaller { l = m; }
         else { r = m; }
@@ -178,7 +178,7 @@ fn get_upper(seq: &[u8], mem: &(usize, usize), sa: &[usize]) -> usize {
     let mut r = sa.len();
 
     while l < r-1 {
-        let m = (l + r - 1) / 2;
+        let m = (l + r) / 2;
         let (e, sa_smaller) = lce(seq, sa[m], mem.0);
         if e < mem.1 && !sa_smaller { r = m; }
         else { l = m; }
@@ -237,13 +237,18 @@ mod tests {
     #[test]
     fn test_binsearch() {
         let seq = b"AGGTTAGTAC$AGTAACGTTAAC$";
-        let mem = (17, 2);
         let sa = suffix_array(seq);
 
+        let mem = (17, 2);
         let expected_result = (14, 18);
         let lower = get_lower(seq, &mem, &sa);
         let upper = get_upper(seq, &mem, &sa);
+        assert_eq!((lower, upper), expected_result);
 
+        let mem = (11, 2);
+        let expected_result = (7, 10);
+        let lower = get_lower(seq, &mem, &sa);
+        let upper = get_upper(seq, &mem, &sa);
         assert_eq!((lower, upper), expected_result);
     }
 }
