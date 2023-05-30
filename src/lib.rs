@@ -29,6 +29,7 @@ fn reverse_complement(s: &[u8]) -> Vec<u8> {
             b'C' => { result[n-1-i] = b'G'; },
             b'G' => { result[n-1-i] = b'C'; },
             b'T' => { result[n-1-i] = b'A'; },
+            b'N' => { result[n-1-i] = b'N'; },
             _ => { panic!("Unexpected letter in s."); }
         }
     }
