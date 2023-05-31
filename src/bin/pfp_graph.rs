@@ -1,4 +1,6 @@
 use std::collections::HashMap;
+use std::io::Write;
+use std::io;
 use std::str;
 
 fn main() { todo!(); }
@@ -14,7 +16,7 @@ fn split_prefix_free(
 
     let mut path = Vec::new();
     let mut i = 0;
-    for j in 0..n-k+1 {
+    for j in 1..n-k+1 {
         if triggers.contains(&&seq[j..j+k]) {
             let segment_seq = &seq[i..j+k];
             let  segment_id = segments.get(segment_seq);
@@ -33,14 +35,40 @@ fn split_prefix_free(
     paths.push(path);
 }
 
+fn print_gfa<T: Write>(
+      segments: &Vec<(Vec<u8>, usize)>,
+         paths: &Vec<Vec<usize>>,
+             k: usize,  // size of the trigger words
+    mut output: T
+) -> io::Result<()> {
+
+    writeln!(output, "H\tVN:Z:1.1")?;
+    for (seq, id) in segments {
+        let seq = str::from_utf8(&seq[k..]).expect("Cannot convert seq to UTF8");
+        writeln!(output, "S\t{}\t{}", id, seq)?;
+    }
+
+    for (i, path) in paths.iter().enumerate() {
+        let path_str = path.iter().map(|x| format!("{}+", x)).collect::<Vec<_>>().join(",");
+        writeln!(output, "P\t{}\t{}\t*", i, path_str)?;
+
+        for j in 0..path.len()-1 {
+            writeln!(output, "L\t{}\t+\t{}\t+\t0M", path[j], path[j+1])?;
+        }
+    }
+    return Ok(());
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::io::stdout;
 
     #[test]
     fn test() {
         let triggers: Vec<&[u8]> = vec![b"$$", b"AC"];
-        let seq1 = b"$$AGACACGTACGAAC$$";
+        let k = 2;
+        let seq1 = b"$$AGACACGTACGAACA$$";
         let seq2 = b"$$AACGTGTACGTACGAAC$$";
 
         let mut segments = HashMap::new();
@@ -49,46 +77,17 @@ mod tests {
         split_prefix_free(seq1, &triggers, &mut segments, &mut paths);
         split_prefix_free(seq2, &triggers, &mut segments, &mut paths);
 
-        println!("{:?}", segments);
-        println!("{:?}", paths);
-        for (k, v) in segments.iter() {
-            println!("{}: {}", v, str::from_utf8(k).unwrap());
+        let mut segments: Vec<_> = segments.into_iter().collect();
+        segments.sort_unstable();
+
+        let mut mapping = vec![0; segments.len()];
+        for (i, (_, id)) in segments.iter().enumerate() { mapping[*id] = i; }
+
+        for (_, id) in segments.iter_mut() { *id = mapping[*id]; }
+        for path in paths.iter_mut() {
+            for id in path { *id = mapping[*id]; }
         }
 
-        // reorder phrases
-        let mut map: Vec<(&Vec<u8>, &usize)> = segments.iter().collect();
-        map.sort_unstable();
-        println!("{:?}", map);
-
-        let mut mapping = vec![0; map.len()];
-        for (i, (_, &v)) in map.iter().enumerate() {
-            mapping[v] = i;
-        }
-        println!("{:?}", mapping);
-
-        for (_, v) in segments.iter_mut() { *v = mapping[*v]; }
-        for path in &mut paths {
-            println!("{:?}", path);
-            for i in 0..path.len() {
-                path[i] = mapping[path[i]];
-            }
-        }
-        println!("{:?}", segments);
-        println!("{:?}", paths);
-
-        // print GFA
-        println!("H\tVN:Z:1.1");
-        for (k, v) in segments {
-            println!("S\t{}\t{}", v, str::from_utf8(&k[2..]).unwrap())
-        }
-        for (i, path) in paths.iter().enumerate() {
-            print!("P\t{}\t", i);
-            for val in path { print!("{}+,", val); }
-            println!("\t*");
-
-            for i in 1..path.len() {
-                println!("L\t{}\t+\t{}\t+\t0M", path[i-1], path[i]);
-            }
-        }
+        print_gfa(&segments, &paths, k, stdout()).expect("Error writting GFA");
     }
 }
