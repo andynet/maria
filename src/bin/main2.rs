@@ -166,21 +166,27 @@ fn create_map(segments: &[Segment<usize, ()>]) -> HashMap<usize, Vec<u8>> {
     return map;
 }
 
-struct Dictionary<'a> {
-    content: Vec<u8>,               // Segment sequences joined on "$"
-    map: HashMap<usize, &'a[u8]>    // Segment names to sequences
+struct ContentSlice { start: usize, end: usize }
+
+struct Dictionary {
+    content: Vec<u8>,                   // Segment sequences joined on "$"
+    map: HashMap<usize, ContentSlice>   // Segment names to sequences
+    // ^- Is this possible to do with &[u8] slices? It does not look possible now. [2023-05-31]
 }
 
-impl From<Vec<Segment<usize, ()>>> for Dictionary<'_> {
+impl From<Vec<Segment<usize, ()>>> for Dictionary {
     fn from(segments: Vec<Segment<usize, ()>>) -> Self {
-        let mut next_start = 0;
         let mut content = Vec::new();
         let mut map = HashMap::new();
+
         for segment in segments {
+            let slice = ContentSlice {
+                start: content.len(),
+                end:   content.len() + segment.sequence.len()
+            };
+            map.insert(segment.name, slice);
             content.extend_from_slice(&segment.sequence);
-            // map.insert(segment.name, &content[next_start..content.len()]);
             content.push(b'$');
-            next_start = content.len();
         }
         return Dictionary{ content, map };
     }
@@ -196,6 +202,9 @@ fn main() {
         .expect("Error parsing GFA file.");
 
     let dictionary = Dictionary::from(gfa.segments);
+    for (k, v) in &dictionary.map {
+        println!("{}\t{:?}", k, &dictionary.content[v.start..v.end]);
+    }
     let (stag, ssa) = get_sampled_arrays(&gfa.paths, &dictionary);
 }
 
