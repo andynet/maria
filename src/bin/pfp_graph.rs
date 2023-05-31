@@ -3,13 +3,34 @@ use std::str;
 
 fn main() { todo!(); }
 
-fn split_prefix_free(seq: &[u8], triggers: &[&[u8]]) 
-    -> (HashMap<Vec<u8>, usize>, Vec<Vec<usize>>) 
-{
-    let mut segments = HashMap::new();
-    let mut paths = Vec::new();
+fn split_prefix_free(
+         seq: &[u8],
+    triggers: &[&[u8]],
+    segments: &mut HashMap<Vec<u8>, usize>,
+       paths: &mut Vec<Vec<usize>>
+) {
+    let n = seq.len();
+    let k = triggers.first().expect("No triggers found.").len();
 
-    return (segments, paths);
+    let mut path = Vec::new();
+    let mut i = 0;
+    for j in 0..n-k+1 {
+        if triggers.contains(&&seq[j..j+k]) {
+            let segment_seq = &seq[i..j+k];
+            let  segment_id = segments.get(segment_seq);
+
+            match segment_id {
+                Some(&id) => { path.push(id); },
+                None => {
+                    path.push(segments.len());
+                    segments.insert(segment_seq.to_owned(), segments.len());
+                }
+            }
+
+            i = j;
+        }
+    }
+    paths.push(path);
 }
 
 #[cfg(test)]
@@ -19,35 +40,20 @@ mod tests {
     #[test]
     fn test() {
         let triggers: Vec<&[u8]> = vec![b"$$", b"AC"];
-        let seq = b"$$AGACACGTACGAAC$$";
+        let seq1 = b"$$AGACACGTACGAAC$$";
+        let seq2 = b"$$AACGTGTACGTACGAAC$$";
 
-        let mut segments: HashMap<Vec<u8>, usize> = HashMap::new();
-        let mut paths: Vec<Vec<usize>> = Vec::new();
+        let mut segments = HashMap::new();
+        let mut paths    = Vec::new();
 
-        let k = triggers[0].len();
+        split_prefix_free(seq1, &triggers, &mut segments, &mut paths);
+        split_prefix_free(seq2, &triggers, &mut segments, &mut paths);
 
-        // create phrases
-        let mut start = 0;
-        let mut segid = 0;
-        paths.push(Vec::new());
-        let n = seq.len();
-        for i in 0..n-k+1 {
-            if triggers.contains(&&seq[i..i+k]) {
-                println!("{}", str::from_utf8(&seq[start..i+k]).unwrap());
-                let v = segments.get(&seq[start..k+i]);
-                match v {
-                    None => {
-                        segments.insert(seq[start..i+k].to_owned(), segid);
-                        paths.last_mut().unwrap().push(segid);
-                        segid += 1;
-                    },
-                    Some(v) => { paths.last_mut().unwrap().push(*v); }
-                }
-                start = i;
-            }
-        }
         println!("{:?}", segments);
         println!("{:?}", paths);
+        for (k, v) in segments.iter() {
+            println!("{}: {}", v, str::from_utf8(k).unwrap());
+        }
 
         // reorder phrases
         let mut map: Vec<(&Vec<u8>, &usize)> = segments.iter().collect();
@@ -62,6 +68,7 @@ mod tests {
 
         for (_, v) in segments.iter_mut() { *v = mapping[*v]; }
         for path in &mut paths {
+            println!("{:?}", path);
             for i in 0..path.len() {
                 path[i] = mapping[path[i]];
             }
