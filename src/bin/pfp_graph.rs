@@ -1,9 +1,39 @@
 use std::collections::HashMap;
+use std::io::stdout;
 use std::io::Write;
 use std::io;
 use std::str;
 
-fn main() { todo!(); }
+fn main() { 
+    let triggers: Vec<&[u8]> = vec![b"T"];
+    let k = 1;
+    let seq = b"ATCTGTTAATG$";
+
+    let mut segments = HashMap::new();
+    let mut paths = Vec::new();
+
+    split_prefix_free(seq, &triggers, &mut segments, &mut paths);
+
+    let (segments, paths) = normalize(segments, paths);
+
+    print_gfa(&segments, &paths, k, stdout()).expect("Error writting GFA");
+}
+
+fn normalize(segments: HashMap<Vec<u8>, usize>, mut paths: Vec<Vec<usize>>)
+    -> (Vec<(Vec<u8>, usize)>, Vec<Vec<usize>>) 
+{
+    let mut segments: Vec<_> = segments.into_iter().collect();
+    segments.sort_unstable();
+
+    let mut mapping = vec![0; segments.len()];
+    for (i, (_, id)) in segments.iter().enumerate() { mapping[*id] = i; }
+
+    for (_, id) in segments.iter_mut() { *id = mapping[*id]; }
+    for path in paths.iter_mut() {
+        for id in path { *id = mapping[*id]; }
+    }
+    return (segments, paths);
+}
 
 fn add_segment(
          seq: &[u8],
@@ -69,56 +99,21 @@ fn print_gfa<T: Write>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::io::stdout;
-
-    #[test]
-    fn test() {
-        let triggers: Vec<&[u8]> = vec![b"AC"];
-        let k = 2;
-        let seq1 = b"AGACACGTACGAACA$";
-        let seq2 = b"AACGTGTACGTACGAAC$";
-
-        let mut segments = HashMap::new();
-        let mut paths    = Vec::new();
-
-        split_prefix_free(seq1, &triggers, &mut segments, &mut paths);
-        split_prefix_free(seq2, &triggers, &mut segments, &mut paths);
-
-        let mut segments: Vec<_> = segments.into_iter().collect();
-        segments.sort_unstable();
-
-        let mut mapping = vec![0; segments.len()];
-        for (i, (_, id)) in segments.iter().enumerate() { mapping[*id] = i; }
-
-        for (_, id) in segments.iter_mut() { *id = mapping[*id]; }
-        for path in paths.iter_mut() {
-            for id in path { *id = mapping[*id]; }
-        }
-
-        print_gfa(&segments, &paths, k, stdout()).expect("Error writting GFA");
-    }
 
     #[test]
     fn test_only_prefix_free() {
         let triggers: Vec<&[u8]> = vec![b"T"];
         let k = 1;
-        let seq = b"ATCTGTTAATG$";
+        let seq1 = b"ATCTGTTAATG$";
+        let seq2 = b"AACGTGTACGTACGAAC$";
 
         let mut segments = HashMap::new();
         let mut paths = Vec::new();
 
-        split_prefix_free(seq, &triggers, &mut segments, &mut paths);
+        split_prefix_free(seq1, &triggers, &mut segments, &mut paths);
+        split_prefix_free(seq2, &triggers, &mut segments, &mut paths);
 
-        let mut segments: Vec<_> = segments.into_iter().collect();
-        segments.sort_unstable();
-
-        let mut mapping = vec![0; segments.len()];
-        for (i, (_, id)) in segments.iter().enumerate() { mapping[*id] = i; }
-
-        for (_, id) in segments.iter_mut() { *id = mapping[*id]; }
-        for path in paths.iter_mut() {
-            for id in path { *id = mapping[*id]; }
-        }
+        let (segments, paths) = normalize(segments, paths);
 
         print_gfa(&segments, &paths, k, stdout()).expect("Error writting GFA");
     }
