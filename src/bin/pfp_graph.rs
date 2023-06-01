@@ -1,10 +1,9 @@
-use std::collections::HashMap;
-use std::fs;
-use std::io::stdout;
-use std::io::Write;
-use std::io;
-use std::str;
+use bio::io::fasta;
 use clap::Parser;
+use std::collections::HashMap;
+use std::fs::{self, File};
+use std::io::{self, Write};
+use std::str;
 
 /// Build prefix-free graph
 #[derive(Parser, Debug)]
@@ -27,18 +26,24 @@ fn main() {
     let mut segments = HashMap::new();
     let mut paths = Vec::new();
 
-    let seq = b"ATCTGTTAATG$";
-    split_prefix_free(seq, &triggers, &mut segments, &mut paths);
+    let fasta = File::open(args.fasta_file).expect("Cannot open fasta file.");
+    let mut records = fasta::Reader::new(fasta).records();
+    while let Some(Ok(record)) = records.next() {
+        // record.seq().len();
+        let mut seq = record.seq().to_owned();
+        seq.push(b'$');
+        split_prefix_free(&seq, &triggers, &mut segments, &mut paths);
+    }
 
     let (segments, paths) = normalize(segments, paths);
 
-    print_gfa(&segments, &paths, trigs_size, stdout())
+    let output = File::create(args.output).expect("Cannot create output file.");
+    print_gfa(&segments, &paths, trigs_size, output)
         .expect("Error writting GFA");
 }
 
 fn get_triggers(trigs: &[u8], size: usize) -> Vec<&[u8]> {
     let mut result = Vec::new();
-    println!("{:?}", trigs);
     for i in (0..trigs.len()).step_by(size+1) {
         result.push(&trigs[i..i+size]);
     }
@@ -134,6 +139,7 @@ fn print_gfa<T: Write>(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::io::stdout;
 
     #[test]
     fn test_only_prefix_free() {
