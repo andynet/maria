@@ -1,22 +1,57 @@
 use std::collections::HashMap;
+use std::fs;
 use std::io::stdout;
 use std::io::Write;
 use std::io;
 use std::str;
+use clap::Parser;
+
+/// Build prefix-free graph
+#[derive(Parser, Debug)]
+#[command(author, version, about)]
+struct Args {
+    /// fasta file
+    fasta_file: String,
+    /// trigger file, containing one trigger per line
+    trigger_file: String,
+    /// output in GFA format v1.1
+    output: String,
+}
 
 fn main() { 
-    let triggers: Vec<&[u8]> = vec![b"T"];
-    let k = 1;
-    let seq = b"ATCTGTTAATG$";
+    let args = Args::parse();
+
+    let (trigs, trigs_size) = load_trigs(&args.trigger_file);
+    let triggers = get_triggers(&trigs, trigs_size);
 
     let mut segments = HashMap::new();
     let mut paths = Vec::new();
 
+    let seq = b"ATCTGTTAATG$";
     split_prefix_free(seq, &triggers, &mut segments, &mut paths);
 
     let (segments, paths) = normalize(segments, paths);
 
-    print_gfa(&segments, &paths, k, stdout()).expect("Error writting GFA");
+    print_gfa(&segments, &paths, trigs_size, stdout())
+        .expect("Error writting GFA");
+}
+
+fn get_triggers(trigs: &[u8], size: usize) -> Vec<&[u8]> {
+    let mut result = Vec::new();
+    println!("{:?}", trigs);
+    for i in (0..trigs.len()).step_by(size+1) {
+        result.push(&trigs[i..i+size]);
+    }
+    return result;
+}
+
+fn load_trigs(filename: &str) -> (Vec<u8>, usize) {
+    let trigs = fs::read_to_string(filename)
+        .expect("Unable to read the triggers file")
+        .trim().as_bytes().to_owned();
+
+    let trigs_size = trigs.iter().position(|&x| x == b'\n').unwrap();
+    return (trigs, trigs_size);
 }
 
 fn normalize(segments: HashMap<Vec<u8>, usize>, mut paths: Vec<Vec<usize>>)
