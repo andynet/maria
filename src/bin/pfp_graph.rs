@@ -55,7 +55,11 @@ fn load_trigs(filename: &str) -> (Vec<u8>, usize) {
         .expect("Unable to read the triggers file")
         .trim().as_bytes().to_owned();
 
-    let trigs_size = trigs.iter().position(|&x| x == b'\n').unwrap();
+    let trigs_size;
+    match trigs.iter().position(|&x| x == b'\n') {
+        None    => { trigs_size = trigs.len(); },
+        Some(x) => { trigs_size = x; }
+    }
     return (trigs, trigs_size);
 }
 
