@@ -2,8 +2,9 @@ use gfa::parser::GFAParser;
 use gfa::gfa::Segment;
 use gfa::gfa::{Path, SegmentId};
 use gfa::optfields::*;
-use maria::{inverse_suffix_array,tag_array};
+use maria::inverse_suffix_array;
 use bio::data_structures::suffix_array::suffix_array;
+use bio::data_structures::suffix_array::lcp as lcp_array;
 use std::str;
 use std::str::FromStr;
 use clap::Parser;
@@ -89,8 +90,36 @@ fn get_sampled_arrays(paths: &[Path<usize, ()>], dict: &Dictionary) -> (Vec<Grap
     let mut tag_sample = Vec::new();
     let mut sa_sample = Vec::new();
 
+    let n = dict.content.len();
+
     let sa  = suffix_array(&dict.content);
+    let lcp = lcp_array(&dict.content, &sa).decompress();
     let isa = inverse_suffix_array(&sa);
+
+    // let tag = tag_array(&dict, &isa);
+    // let rs  = remaining_suffix(&isa, &dict);
+    //
+    // for mut i in 0..n {
+    //     if rs[i] <= overlap { continue; }
+    //
+    //     if lcp[i] < rs[i] && lcp[i+1] < rs[i] { 
+    //         tag_sample.push(tags[i]); 
+    //         sa_sample.push(sa_begin);
+    //         tag_sample.push(tags[i]);
+    //         sa_sample.push(sa_end);
+    //     }
+    //
+    //     while same_prefix {
+    //         cumulate();
+    //     }
+    //     resolve_same();
+    //
+    // }
+
+    for i in 0..sa.len() {
+        println!("{i}\t{}\t{}\t{}", sa[i], lcp[i],
+            str::from_utf8(&dict.content[sa[i]..]).unwrap());
+    }
 
     return (tag_sample, sa_sample);
 }
@@ -186,8 +215,9 @@ impl From<Vec<Segment<usize, ()>>> for Dictionary {
             };
             map.insert(segment.name, slice);
             content.extend_from_slice(&segment.sequence);
-            content.push(b'$');
+            // content.push(b'$');
         }
+        content.push(b'$');
         return Dictionary{ content, map };
     }
 }
@@ -202,9 +232,10 @@ fn main() {
         .expect("Error parsing GFA file.");
 
     let dictionary = Dictionary::from(gfa.segments);
-    for (k, v) in &dictionary.map {
-        println!("{}\t{:?}", k, &dictionary.content[v.start..v.end]);
-    }
+    // for (k, v) in &dictionary.map {
+    //     println!("{}\t{:?}", k, str::from_utf8(&dictionary.content[v.start..v.end]));
+    // }
+    println!();
     let (stag, ssa) = get_sampled_arrays(&gfa.paths, &dictionary);
 }
 
