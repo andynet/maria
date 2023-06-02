@@ -31,7 +31,7 @@ fn main() {
     while let Some(Ok(record)) = records.next() {
         // record.seq().len();
         let mut seq = record.seq().to_owned();
-        seq.push(b'$');
+        seq.push(b'.');
         split_prefix_free(&seq, &triggers, &mut segments, &mut paths);
     }
 
