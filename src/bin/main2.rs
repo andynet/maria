@@ -239,3 +239,11 @@ fn main() {
     let (stag, ssa) = get_sampled_arrays(&gfa.paths, &dictionary);
 }
 
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn test() {
+        println!("Testing.");
+    }
+}
+
