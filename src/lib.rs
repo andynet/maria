@@ -54,9 +54,7 @@ fn get_sequence(
 
 pub fn inverse_suffix_array(sa: &[usize]) -> Vec<usize> {
     let mut isa = vec![0; sa.len()];
-    for i in 0..sa.len() {
-        isa[sa[i]] = i;
-    }
+    for i in 0..sa.len() { isa[sa[i]] = i; }
     return isa;
 }
 
