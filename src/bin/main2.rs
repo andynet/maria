@@ -207,10 +207,44 @@ mod tests {
                 i, node_len[i], node_freq[i], str_pos[i], orig_pos[i], right_content_sa[i]
             );
         }
+        println!();
+
+        let overlap = 1;
+        let mut i = 0;
+        while i < n {
+            let remaining = node_len[nodeid[i]] - nodepos[i];
+            if remaining <= overlap { i+=1; continue; }
+            let mut j = i+1;
+            while lcp[j] >= remaining as isize {
+                let rem = node_len[nodeid[j]] - nodepos[j];
+                if rem <= overlap { break; }
+                j += 1;
+            }
+
+            // process table from i to j
+            let mut identical_suffixes = Vec::new();
+            for k in i..j {
+                let id = nodeid[k];
+                for l in 0..node_freq[id] {
+                    identical_suffixes.push((
+                        right_content_sa[id][l],
+                        id,
+                        nodepos[k],
+                        orig_pos[id][l] + nodepos[k]
+                    ))
+                }
+            }
+            identical_suffixes.sort_unstable();
+            for (_, id, np, sa) in &identical_suffixes {
+                println!("{}\t{}\t{}", sa, id, np);
+            }
+            identical_suffixes.clear();
+            // end processing
+            i = j;
+        }
 
         // https://github.com/rust-bio/rust-bio/issues/3
         // SAIS is generic, but suffix_array is not... WTF
-
     }
 }
 
