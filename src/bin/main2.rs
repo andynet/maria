@@ -136,23 +136,80 @@ mod tests {
             println!("{}\t{}\t{}\t{}\t{}\t{}", i, nodeid[i], nodepos[i], sa[i], lcp[i],
                 str::from_utf8(&dict_content[sa[i]..]).unwrap())
         }
+        println!();
 
-        // let paths: Vec<Vec<u64>> = Vec::new();
-        // for path in &gfa.paths {
-        //     let p = str::from_utf8(&path.segment_names).unwrap();
-        //     println!("{p}");
-        //
-        //     let to_number = |x: &str| (x[0..x.len()-1].parse::<u64>()
-        //         .expect("Cannot parse path."));
-        //
-        //     let p: Vec<_> = p.split(',').map(to_number).collect();
-        //     paths.push(p);
-        // }
+        let m = &gfa.segments.len() + 1; // one fake sentinel segment
+        let node_len = dict_lengths;
 
-        // let v: Vec<u64> = vec![1215, 5468, 45];
+        let mut paths: Vec<Vec<u64>> = Vec::new();
+        for path in &gfa.paths {
+            let p = str::from_utf8(&path.segment_names).unwrap();
+            let to_number = |x: &str| (x[0..x.len()-1].parse::<u64>()
+                .expect("Cannot parse path."));
+
+            let p: Vec<_> = p.split(',').map(to_number).collect();
+            paths.push(p);
+        }
+
+        let mut node_freq = vec![0; m];
+        for p in paths.iter() {
+            for node in p {
+                node_freq[*node as usize] += 1;
+            }
+            let last = node_freq.last_mut().unwrap();
+            *last += 1;
+        }
+
+        let mut str_pos = vec![Vec::new(); m];
+        let mut pos = 0;
+        for p in paths.iter() {
+            for node in p {
+                str_pos[*node as usize].push(pos);
+                pos += 1;
+            }
+            let last = str_pos.last_mut().unwrap();
+            last.push(pos);
+            pos += 1;
+        }
+
+        let mut orig_pos = vec![Vec::new(); m];
+        let mut pos = 0;
+        for p in paths.iter() {
+            for node in p {
+                orig_pos[*node as usize].push(pos);
+                pos += node_len[*node as usize] - 1;
+            }
+            orig_pos[m-1].push(pos);
+            pos += 1;
+        }
+
+        let mut path = Vec::new();
+        for p in paths.iter() {
+            let p: Vec<u64> = p.iter().map(|x| x + 1).collect();
+            path.extend_from_slice(&p);
+            path.push(0);
+        }
+
+        let path_sa = SuffixArray::create(&path[..]);
+        let path_isa = inverse_suffix_array(&path_sa);
+        let mut right_content_sa = Vec::new();
+        for s_pos in &str_pos {
+            let i = right_content_sa.len();
+            right_content_sa.push(Vec::new());
+            for p in s_pos {
+                let rc_start = (p+1)%path_isa.len();
+                right_content_sa[i].push(path_isa[rc_start]);
+            }
+        }
+
+        for i in 0..m {
+            println!("{}\t{}\t{}\t{:?}\t{:?}\t{:?}",
+                i, node_len[i], node_freq[i], str_pos[i], orig_pos[i], right_content_sa[i]
+            );
+        }
+
         // https://github.com/rust-bio/rust-bio/issues/3
         // SAIS is generic, but suffix_array is not... WTF
-        // let sa2 = SuffixArray::create(&v[..]);
 
     }
 }
