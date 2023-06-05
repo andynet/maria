@@ -115,6 +115,8 @@ where
 }
 
 pub mod arrays {
+    // https://github.com/rust-bio/rust-bio/issues/3
+    // SAIS is generic, but suffix_array is not... WTF
     // https://stackoverflow.com/a/41597323
     use bio::data_structures::suffix_array::suffix_array;
 
@@ -128,10 +130,10 @@ pub mod arrays {
         }
     }
 
-    impl SuffixArray for [u64] {
+    impl SuffixArray for [usize] {
         fn create(&self) -> Vec<usize> {
             let n = self.len();
-            let mut v: Vec<(&[u64], usize)> = Vec::with_capacity(n);
+            let mut v: Vec<(&[usize], usize)> = Vec::with_capacity(n);
             for i in 0..n {
                 v.push((&self[i..], i));
             }
@@ -158,7 +160,7 @@ pub mod arrays {
             // 2: TCAG$GA
             assert_eq!(vec![6, 4, 1, 3, 5, 0, 2], sa);
 
-            let v: Vec<u64> = vec![3, 1, 4, 2, 1, 3, 0];
+            let v: Vec<usize> = vec![3, 1, 4, 2, 1, 3, 0];
             let sa = SuffixArray::create(&v[..]);
             assert_eq!(vec![6, 4, 1, 3, 5, 0, 2], sa);
         }
