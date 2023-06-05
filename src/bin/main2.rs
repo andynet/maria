@@ -82,17 +82,6 @@ fn join_paths(paths: &[Vec<usize>]) -> Vec<usize> {
     return path_join; 
 }
 
-fn join_u8(slice: &[Vec<u8>]) -> Vec<u8> {
-    let mut result = Vec::new();
-    for vector in slice {
-        let v: Vec<u8> = vector.iter().map(|x| x + 2).collect();
-        result.extend_from_slice(&v);
-        result.push(1);
-    }
-    result.push(0);
-    return result;
-}
-
 fn join<T>(slice: &[Vec<T>]) -> Vec<T> 
 where
     T: From<u8> + Add<T, Output = T> + Copy
@@ -104,16 +93,6 @@ where
         result.push(1.into());
     }
     result.push(0.into());
-    return result;
-}
-
-fn join_usize(slice: &[Vec<usize>]) -> Vec<usize> {
-    let mut result = Vec::new();
-    for vector in slice {
-        let v: Vec<usize> = vector.iter().map(|x| x + 2).collect();
-        result.push(1);
-    }
-    result.push(0);
     return result;
 }
 
@@ -157,6 +136,47 @@ fn get_frequency(path_join: &[usize], m: usize) -> Vec<usize> {
     return freq;
 }
 
+fn get_frequency2(path_join: &[usize], size: usize) -> Vec<usize> {
+    let mut result = vec![0; size];
+    for id in path_join {
+        if *id >= 2 { result[id-2] += 1; }
+    }
+    return result;
+}
+
+fn get_node_ids(segment_join: &[u8], isa: &[usize]) -> Vec<usize> {
+    let mut result = vec![0; segment_join.len()];
+    let mut id = 0;
+    for i in 0..segment_join.len() {
+        result[isa[i]] = id;
+        if segment_join[i] == 1 { id += 1; }
+    }
+    return result;
+}
+
+fn get_node_pos(segment_join: &[u8], isa: &[usize]) -> Vec<usize> {
+    let mut result = vec![0; segment_join.len()];
+    let mut pos = 0;
+    for i in 0..segment_join.len() {
+        result[isa[i]] = pos;
+        pos += 1;
+        if segment_join[i] == 1 { pos = 0; }
+    }
+    return result;
+}
+
+fn get_sequence_position(path_join: &[usize], len: &[usize], overlap: usize) -> Vec<Vec<usize>> {
+    let mut result = vec![Vec::new(); len.len()];
+    let mut start = 0;
+    for id in path_join {
+        if *id >= 2 {
+            result[id-2].push(start);
+            start += len[id-2] - overlap;
+        }
+    }
+    return result;
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -172,7 +192,13 @@ mod tests {
         let paths: Vec<Vec<usize>> = parse_paths(&gfa.paths);
 
         let segment_join = join_segments(&segments);
+        // let tmp = join(&segments);
+        // println!("{:?}", segment_join);
+        // println!("{:?}", tmp);
         let path_join = join_paths(&paths);
+        // let tmp = join(&paths);
+        // println!("{:?}", path_join);
+        // println!("{:?}", tmp);
 
         let n = segment_join.len();
         let m = &gfa.segments.len() + 1; // one fake sentinel segment
@@ -268,6 +294,49 @@ mod tests {
             identical_suffixes.clear();
             // end processing
             i = j;
+        }
+    }
+
+    #[test]
+    fn test_cleaner() {
+        let parser: GFAParser<usize, ()> = GFAParser::new();
+        let gfa = parser.parse_file("data/pftag/test.gfa")
+            .expect("Error parsing GFA file.");
+
+        let overlap = 1;
+        let segments: Vec<Vec<u8>> = parse_segments(&gfa.segments);
+        let paths: Vec<Vec<usize>> = parse_paths(&gfa.paths);
+
+        let segment_join = join(&segments);
+        let path_join = join(&paths);
+
+        let sa  = SuffixArray::create(&*segment_join);
+        let lcp = lcp_array(&segment_join, &sa).decompress();
+        let isa = inverse_suffix_array(&sa);
+
+        let id  = get_node_ids(&segment_join, &isa);
+        let pos = get_node_pos(&segment_join, &isa);
+
+        let mut segment_join_repr = segment_join.clone();
+        for c in segment_join_repr.iter_mut() {
+            match *c {
+                0   => { *c = b'$'; },
+                1   => { *c = b'#'; },
+                2.. => { *c -= 2; }
+            }
+        }
+        for i in 0..sa.len() {
+            println!("{}\t{}\t{}\t{}\t{}\t{}", i, sa[i], lcp[i], id[i], pos[i],
+                str::from_utf8(&segment_join_repr[sa[i]..]).unwrap());
+        }
+
+        let len  = get_lengths(&segments);
+        let freq = get_frequency2(&path_join, segments.len());
+        let seq_pos = get_sequence_position(&path_join, &len, overlap);
+        // let rc_rank = get_right_context_rank(&path_join);
+
+        for i in 0..segments.len() {
+            println!("{}\t{}\t{}\t{:?}", i, len[i], freq[i], seq_pos[i]);
         }
     }
 }
