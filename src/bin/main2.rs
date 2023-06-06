@@ -177,6 +177,20 @@ fn get_sequence_position(path_join: &[usize], len: &[usize], overlap: usize) -> 
     return result;
 }
 
+fn get_right_context_rank(path_join: &[usize], size: usize) -> Vec<Vec<usize>> {
+    let mut result = vec![Vec::new(); size];
+
+    let sa = SuffixArray::create(&path_join[..]);
+    let isa = inverse_suffix_array(&sa);
+
+    for (i, id) in path_join.iter().enumerate() {
+        if *id >= 2 {
+            result[id-2].push(isa[i+1]);
+        }
+    }
+    return result;
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -329,15 +343,19 @@ mod tests {
             println!("{}\t{}\t{}\t{}\t{}\t{}", i, sa[i], lcp[i], id[i], pos[i],
                 str::from_utf8(&segment_join_repr[sa[i]..]).unwrap());
         }
+        println!();
 
         let len  = get_lengths(&segments);
         let freq = get_frequency2(&path_join, segments.len());
         let seq_pos = get_sequence_position(&path_join, &len, overlap);
-        // let rc_rank = get_right_context_rank(&path_join);
+        let rc_rank = get_right_context_rank(&path_join, segments.len());
 
-        for i in 0..segments.len() {
-            println!("{}\t{}\t{}\t{:?}", i, len[i], freq[i], seq_pos[i]);
+        for id in 0..segments.len() {
+            println!("{}\t{}\t{}\t{:?}\t{:?}", 
+                id, len[id], freq[id], seq_pos[id], rc_rank[id]
+            );
         }
+        println!();
     }
 }
 
