@@ -191,6 +191,42 @@ fn get_right_context_rank(path_join: &[usize], size: usize) -> Vec<Vec<usize>> {
     return result;
 }
 
+fn print_tag_array(
+        lcp: &[isize],
+         id: &[usize],
+        pos: &[usize],
+    overlap: usize,
+        len: &[usize],
+       freq: &[usize],
+    seq_pos: &[Vec<usize>],
+    rc_rank: &[Vec<usize>],
+) {
+    let mut i = len.len() + 1;
+    while i < id.len() {
+        let remaining = len[id[i]] - pos[i];
+        if remaining <= overlap { i += 1; continue; }
+        let mut j = i+1;
+        while lcp[j] >= remaining as isize { j += 1; }
+
+        let mut identical_suffixes = Vec::new();
+        for k in i..j {
+            for l in 0..freq[id[k]] {
+                identical_suffixes.push((
+                    rc_rank[id[k]][l],
+                    id[k],
+                    pos[k],
+                    seq_pos[id[k]][l] + pos[k]
+                ))
+            }
+        }
+        identical_suffixes.sort_unstable();
+        for (_, id, pos, sa) in &identical_suffixes {
+            println!("{}\t{}\t{}", sa, id, pos);
+        }
+        i = j;
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -345,8 +381,8 @@ mod tests {
         }
         println!();
 
-        let len  = get_lengths(&segments);
-        let freq = get_frequency2(&path_join, segments.len());
+        let len     = get_lengths(&segments);
+        let freq    = get_frequency2(&path_join, segments.len());
         let seq_pos = get_sequence_position(&path_join, &len, overlap);
         let rc_rank = get_right_context_rank(&path_join, segments.len());
 
@@ -356,6 +392,8 @@ mod tests {
             );
         }
         println!();
+
+        print_tag_array(&lcp, &id, &pos, overlap, &len, &freq, &seq_pos, &rc_rank);
     }
 }
 
