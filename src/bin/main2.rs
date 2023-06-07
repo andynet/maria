@@ -1,12 +1,12 @@
-use gfa::parser::GFAParser;
 use bio::data_structures::suffix_array::lcp as lcp_array;
 use clap::Parser;
+use gfa::gfa::Path;
+use gfa::gfa::Segment;
+use gfa::parser::GFAParser;
+use maria::arrays::SuffixArray;
+use std::ops::Add;
 use std::str;
 use std::usize;
-use maria::arrays::SuffixArray;
-use gfa::gfa::Segment;
-use gfa::gfa::Path;
-use std::ops::Add;
 
 /// Find MEMs in a graph
 #[derive(Parser, Debug)]
@@ -44,8 +44,7 @@ fn main() {
 
     let path_join = join(&paths);
 
-    let len     = get_lengths(&segments);
-
+    let len = get_lengths(&segments);
     let mut rc_rank = get_right_context_rank(&path_join, segments.len());
     let mut seq_pos = get_sequence_position(&path_join, &len, overlap);
 
@@ -101,14 +100,6 @@ fn get_lengths(segments: &[Vec<u8>]) -> Vec<usize> {
     len.push(1);
     return len;
 }
-
-// fn get_frequency(path_join: &[usize], size: usize) -> Vec<usize> {
-//     let mut result = vec![0; size];
-//     for id in path_join {
-//         if *id >= 2 { result[id-2] += 1; }
-//     }
-//     return result;
-// }
 
 fn get_node_ids(segment_join: &[u8], isa: &[usize]) -> Vec<usize> {
     let mut result = vec![0; segment_join.len()];
@@ -213,7 +204,6 @@ impl<'a> Iterator for Block<'a> {
     type Item = (usize, usize, usize);
 
     fn next(&mut self) -> Option<Self::Item> {
-        // find the smallest rigth context
         let k = argmin(&self.rcr);
         if self.rcr[k] == usize::MAX { return None; }
         let result = (
@@ -229,29 +219,9 @@ impl<'a> Iterator for Block<'a> {
             Some(v) => { self.rcr[k] = *v; }
         }
 
-        // output
         return Some(result);
     }
 }
-
-// fn create_iterator(
-//     id: &[usize], pos: &[usize],
-//     freq: &[usize], seq_pos: &[Vec<usize>], rc_rank: &[Vec<usize>], 
-// ) -> Vec<(usize, usize, usize, usize)>{
-//     let mut identical_suffixes = Vec::new();
-//     for k in 0..id.len() {
-//         for l in 0..freq[id[k]] {
-//             identical_suffixes.push((
-//                 rc_rank[id[k]][l],
-//                 seq_pos[id[k]][l] + pos[k],
-//                 id[k],
-//                 pos[k],
-//             ))
-//         }
-//     }
-//     identical_suffixes.sort_unstable();
-//     return identical_suffixes;
-// }
 
 fn permutation_invert(perm: &[usize]) -> Vec<usize> {
     let mut inverse = vec![0; perm.len()];
