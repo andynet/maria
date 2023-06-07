@@ -1,8 +1,8 @@
 use gfa::parser::GFAParser;
 use bio::data_structures::suffix_array::lcp as lcp_array;
-use maria::inverse_suffix_array;
 use clap::Parser;
 use std::str;
+use std::usize;
 use maria::arrays::SuffixArray;
 use gfa::gfa::Segment;
 use gfa::gfa::Path;
@@ -38,18 +38,24 @@ fn main() {
 
     let sa  = SuffixArray::create(&*segment_join);
     let lcp = lcp_array(&segment_join, &sa).decompress();
-    let isa = inverse_suffix_array(&sa);
+    let isa = permutation_invert(&sa);
     let id  = get_node_ids(&segment_join, &isa);
     let pos = get_node_pos(&segment_join, &isa);
 
     let path_join = join(&paths);
 
     let len     = get_lengths(&segments);
-    let freq    = get_frequency(&path_join, segments.len());
-    let seq_pos = get_sequence_position(&path_join, &len, overlap);
-    let rc_rank = get_right_context_rank(&path_join, segments.len());
 
-    print_tag_array(&lcp, &id, &pos, overlap, &len, &freq, &seq_pos, &rc_rank);
+    let mut rc_rank = get_right_context_rank(&path_join, segments.len());
+    let mut seq_pos = get_sequence_position(&path_join, &len, overlap);
+
+    for i in 0..segments.len() {
+        let iperm = argsort(&rc_rank[i]);
+        rc_rank[i] = permutation_apply(&iperm, &rc_rank[i]);
+        seq_pos[i] = permutation_apply(&iperm, &seq_pos[i]);
+    }
+
+    print_tag_array(&lcp, &id, &pos, overlap, &len, &seq_pos, &rc_rank);
 }
 
 fn parse_segments(segments: &[Segment<usize, ()>]) -> Vec<Vec<u8>> {
@@ -96,13 +102,13 @@ fn get_lengths(segments: &[Vec<u8>]) -> Vec<usize> {
     return len;
 }
 
-fn get_frequency(path_join: &[usize], size: usize) -> Vec<usize> {
-    let mut result = vec![0; size];
-    for id in path_join {
-        if *id >= 2 { result[id-2] += 1; }
-    }
-    return result;
-}
+// fn get_frequency(path_join: &[usize], size: usize) -> Vec<usize> {
+//     let mut result = vec![0; size];
+//     for id in path_join {
+//         if *id >= 2 { result[id-2] += 1; }
+//     }
+//     return result;
+// }
 
 fn get_node_ids(segment_join: &[u8], isa: &[usize]) -> Vec<usize> {
     let mut result = vec![0; segment_join.len()];
@@ -141,7 +147,7 @@ fn get_right_context_rank(path_join: &[usize], size: usize) -> Vec<Vec<usize>> {
     let mut result = vec![Vec::new(); size];
 
     let sa = SuffixArray::create(&path_join[..]);
-    let isa = inverse_suffix_array(&sa);
+    let isa = permutation_invert(&sa);
 
     for (i, id) in path_join.iter().enumerate() {
         if *id >= 2 {
@@ -157,7 +163,6 @@ fn print_tag_array(
         pos: &[usize],
     overlap: usize,
         len: &[usize],
-       freq: &[usize],
     seq_pos: &[Vec<usize>],
     rc_rank: &[Vec<usize>],
 ) {
@@ -168,23 +173,115 @@ fn print_tag_array(
         let mut j = i+1;
         while lcp[j] >= remaining as isize { j += 1; }
 
-        let mut identical_suffixes = Vec::new();
-        for k in i..j {
-            for l in 0..freq[id[k]] {
-                identical_suffixes.push((
-                    rc_rank[id[k]][l],
-                    id[k],
-                    pos[k],
-                    seq_pos[id[k]][l] + pos[k]
-                ))
-            }
-        }
-        identical_suffixes.sort_unstable();
-        for (_, id, pos, sa) in &identical_suffixes {
+        let block = Block::new(&id[i..j], &pos[i..j], seq_pos, rc_rank);
+        for (sa, id, pos) in block {
             println!("{}\t{}\t{}", sa, id, pos);
         }
+
         i = j;
     }
+}
+
+struct Block<'a> {
+         id: &'a[usize],
+        pos: &'a[usize],
+    seq_pos: &'a[Vec<usize>],
+    rc_rank: &'a[Vec<usize>],
+        idx: Vec<usize>,
+        rcr: Vec<usize>
+}
+
+impl<'a> Block<'a> {
+    fn new(
+        id: &'a[usize], pos: &'a[usize], 
+        seq_pos: &'a[Vec<usize>], rc_rank: &'a[Vec<usize>]
+    ) -> Block<'a> {
+
+        let mut rcr = Vec::new();
+        for i in id {
+            rcr.push(rc_rank[*i][0]);
+        }
+        Block { 
+            id, pos, seq_pos, rc_rank, 
+            idx: vec![0; id.len()],
+            rcr
+        }
+    }
+}
+
+impl<'a> Iterator for Block<'a> {
+    type Item = (usize, usize, usize);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        // find the smallest rigth context
+        let k = argmin(&self.rcr);
+        if self.rcr[k] == usize::MAX { return None; }
+        let result = (
+            self.seq_pos[self.id[k]][self.idx[k]] + self.pos[k],
+            self.id[k],
+            self.pos[k]
+        );
+
+        self.idx[k] += 1;
+        let val = self.rc_rank[self.id[k]].get(self.idx[k]);
+        match val {
+            None => { self.rcr[k] = usize::MAX; },
+            Some(v) => { self.rcr[k] = *v; }
+        }
+
+        // output
+        return Some(result);
+    }
+}
+
+// fn create_iterator(
+//     id: &[usize], pos: &[usize],
+//     freq: &[usize], seq_pos: &[Vec<usize>], rc_rank: &[Vec<usize>], 
+// ) -> Vec<(usize, usize, usize, usize)>{
+//     let mut identical_suffixes = Vec::new();
+//     for k in 0..id.len() {
+//         for l in 0..freq[id[k]] {
+//             identical_suffixes.push((
+//                 rc_rank[id[k]][l],
+//                 seq_pos[id[k]][l] + pos[k],
+//                 id[k],
+//                 pos[k],
+//             ))
+//         }
+//     }
+//     identical_suffixes.sort_unstable();
+//     return identical_suffixes;
+// }
+
+fn permutation_invert(perm: &[usize]) -> Vec<usize> {
+    let mut inverse = vec![0; perm.len()];
+    for i in 0..perm.len() { inverse[perm[i]] = i; }
+    return inverse;
+}
+
+fn permutation_apply(perm: &[usize], data: &[usize]) -> Vec<usize> {
+    let mut result = vec![0; perm.len()];
+    for i in 0..perm.len() {
+        result[perm[i]] = data[i];
+    }
+    return result;
+}
+
+fn argsort(data: &[usize]) -> Vec<usize> {
+    let mut v: Vec<(usize, usize)> = data.iter().enumerate().map(|(i, x)| (*x, i)).collect();
+    v.sort_unstable();
+    let v: Vec<usize> = v.iter().map(|(_, i)| *i).collect();
+    let v = permutation_invert(&v);
+    return v;
+}
+
+fn argmin(data: &[usize]) -> usize {
+    let mut min_pos = 0;
+    let mut min_val = usize::MAX;
+    for (p, &v) in data.iter().enumerate() {
+        if v < min_val { min_pos = p; min_val = v; }
+    }
+    return min_pos;
 }
 
 #[cfg(test)]
@@ -206,7 +303,7 @@ mod tests {
 
         let sa  = SuffixArray::create(&*segment_join);
         let lcp = lcp_array(&segment_join, &sa).decompress();
-        let isa = inverse_suffix_array(&sa);
+        let isa = permutation_invert(&sa);
 
         let id  = get_node_ids(&segment_join, &isa);
         let pos = get_node_pos(&segment_join, &isa);
@@ -226,18 +323,23 @@ mod tests {
         println!();
 
         let len     = get_lengths(&segments);
-        let freq    = get_frequency(&path_join, segments.len());
-        let seq_pos = get_sequence_position(&path_join, &len, overlap);
-        let rc_rank = get_right_context_rank(&path_join, segments.len());
+        let mut rc_rank = get_right_context_rank(&path_join, segments.len());
+        let mut seq_pos = get_sequence_position(&path_join, &len, overlap);
+
+        for i in 0..segments.len() {
+            let iperm = argsort(&rc_rank[i]);
+            rc_rank[i] = permutation_apply(&iperm, &rc_rank[i]);
+            seq_pos[i] = permutation_apply(&iperm, &seq_pos[i]);
+        }
 
         for id in 0..segments.len() {
-            println!("{}\t{}\t{}\t{:?}\t{:?}", 
-                id, len[id], freq[id], seq_pos[id], rc_rank[id]
+            println!("{}\t{}\t{:?}\t{:?}", 
+                id, len[id], seq_pos[id], rc_rank[id]
             );
         }
         println!();
 
-        print_tag_array(&lcp, &id, &pos, overlap, &len, &freq, &seq_pos, &rc_rank);
+        print_tag_array(&lcp, &id, &pos, overlap, &len, &seq_pos, &rc_rank);
     }
 }
 
