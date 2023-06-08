@@ -6,11 +6,8 @@ use gfa::gfa::Segment;
 use gfa::parser::GFAParser;
 use maria::arrays::SuffixArray;
 use std::collections::HashMap;
-use std::fmt::Display;
-use std::num::ParseIntError;
 use std::ops::Add;
 use std::str;
-use std::str::FromStr;
 use std::usize;
 
 /// Find MEMs in a graph
@@ -28,51 +25,8 @@ struct Args {
     ptr_filename: String,
 }
 
-#[derive(Clone)]
-enum Direction {
-    Forward,
-    RevComp
-}
-
-use std::fmt;
-impl Display for Direction {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Direction::Forward => { write!(f, "+") },
-            Direction::RevComp => { write!(f, "-") }
-        }
-    } 
-}
-
-#[derive(Clone)]
-struct GraphPos {
-    node_id: usize,
-    direction: Direction,
-    node_pos: usize,
-}
-
-#[derive(Debug)]
-struct ParseGraphPosError;
-impl From<ParseIntError> for ParseGraphPosError {
-    fn from(_: ParseIntError) -> Self { ParseGraphPosError }
-}
-
-impl FromStr for GraphPos {
-    type Err = ParseGraphPosError;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let node_id: usize = s[..s.len()-1].parse()?;
-        let direction;
-        match s.bytes().last().ok_or(ParseGraphPosError)? {
-            b'+' => { direction = Direction::Forward; },
-            b'-' => { direction = Direction::RevComp; },
-            _    => { return Err(ParseGraphPosError); }
-        }
-        let node_pos = 0;
-        Ok(GraphPos { node_id, direction, node_pos })
-    }
-}
-
+mod gp;
+use gp::GraphPos as GraphPos;
 
 fn parse_graph(graph: &GFA<usize, ()>) -> (Vec<usize>, Vec<GraphPos>) {
     let mut len = HashMap::new();
@@ -340,74 +294,4 @@ fn argmin(data: &[usize]) -> usize {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test() {
-        let parser: GFAParser<usize, ()> = GFAParser::new();
-        let gfa = parser.parse_file("data/pftag/test.gfa")
-            .expect("Error parsing GFA file.");
-
-        let overlap = 1;
-        let segments: Vec<Vec<u8>> = parse_segments(&gfa.segments);
-        let paths: Vec<Vec<usize>> = parse_paths(&gfa.paths);
-
-        let segment_join = join(&segments);
-        let path_join = join(&paths);
-
-        let sa  = SuffixArray::create(&*segment_join);
-        let lcp = lcp_array(&segment_join, &sa).decompress();
-        let isa = permutation_invert(&sa);
-
-        let id  = get_node_ids(&segment_join, &isa);
-        let pos = get_node_pos(&segment_join, &isa);
-
-        let mut segment_join_repr = segment_join.clone();
-        for c in segment_join_repr.iter_mut() {
-            match *c {
-                0   => { *c = b'$'; },
-                1   => { *c = b'#'; },
-                2.. => { *c -= 2; }
-            }
-        }
-        for i in 0..sa.len() {
-            println!("{}\t{}\t{}\t{}\t{}\t{}", i, sa[i], lcp[i], id[i], pos[i],
-                str::from_utf8(&segment_join_repr[sa[i]..]).unwrap());
-        }
-        println!();
-
-        let len     = get_lengths(&segments);
-        let mut rc_rank = get_right_context_rank(&path_join, segments.len());
-        let mut seq_pos = get_sequence_position(&path_join, &len, overlap);
-
-        for i in 0..segments.len() {
-            let iperm = argsort(&rc_rank[i]);
-            rc_rank[i] = permutation_apply(&iperm, &rc_rank[i]);
-            seq_pos[i] = permutation_apply(&iperm, &seq_pos[i]);
-        }
-
-        for id in 0..segments.len() {
-            println!("{}\t{}\t{:?}\t{:?}", 
-                id, len[id], seq_pos[id], rc_rank[id]
-            );
-        }
-        println!();
-
-        // print_tag_array(&lcp, &id, &pos, overlap, &len, &seq_pos, &rc_rank);
-    }
-
-    #[test]
-    fn test_arbitrary() {
-        let parser: GFAParser<usize, ()> = GFAParser::new();
-        let arbitrary_graph = parser.parse_file("data/pftag/test_arbitrary.gfa")
-            .expect("Error parsing GFA file.");
-
-        let (seq_pos, graph_pos) = parse_graph(&arbitrary_graph);
-
-        for i in 0..seq_pos.len() {
-            println!("{}\t{}", seq_pos[i], graph_pos[i].node_id);
-        }
-    }
-}
-
+mod tests;
