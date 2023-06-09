@@ -133,11 +133,10 @@ impl<'a> Iterator for Block<'a> {
         if self.rank[k] == usize::MAX { return None; }
 
         let data = self.data;
-        let result = (
-            data.seq_pos[data.id[self.start + k]][self.idx[k]] + data.pos[self.start + k],
-            data.id[self.start + k],
-            data.pos[self.start + k]
-        );
+        let id = data.id[self.start + k];
+        let pos = data.pos[self.start + k];
+
+        let result = (data.seq_pos[id][self.idx[k]] + pos, id, pos);
 
         self.idx[k] += 1;
         match data.rc_rank[data.id[self.start + k]].get(self.idx[k]) {
