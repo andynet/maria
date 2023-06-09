@@ -30,11 +30,7 @@ pub struct PFData {
 
 pub struct PFDataIterator<'a> {
     data: &'a PFData,
-    i: usize,
-    j: usize,
-    idx: Option<Vec<usize>>,
-    rcr: Vec<usize>,
-    block: Option<Block<'a>>,
+    block: Block<'a>,
 }
 
 impl PFData {
@@ -71,13 +67,12 @@ impl PFData {
     }
 
     pub fn iter(&self) -> PFDataIterator {
+        let block = Block::get_block_at(self, 0)
+            .expect("No block found.");
+
         return PFDataIterator { 
             data: self,
-            i: 0,
-            j: self.seg_len.len() + 1, // #separators + sentinel
-            idx: None,
-            rcr: Vec::new(),
-            block: None,
+            block
         }
     }
 }
@@ -85,78 +80,71 @@ impl PFData {
 impl<'a> Iterator for PFDataIterator<'a> {
     type Item = (usize, usize, usize);
 
-    // fn next(&mut self) -> Option<Self::Item> {
-    //     if let Some(x) = self.block.next() { return x; }
-    //     if let Some(self.block) = get_next_block() { return self.block.next(); }
-    //     return None;
-    // }
     fn next(&mut self) -> Option<Self::Item> {
-        let data = self.data;
+        let block = &mut self.block;
+        if let Some(x) = block.next() { return Some(x); }
 
-        if self.idx == None {
-            // find new block
-            //      find new start
-            self.i = self.j;
-            if self.i >= data.sa.len() { return None; }
-            let mut remaining = data.seg_len[data.id[self.i]] - data.pos[self.i];
-            while remaining <= data.overlap { 
-                self.i += 1; 
-                remaining = data.seg_len[data.id[self.i]] - data.pos[self.i];
-            }
-            //      find new end
-            self.j = self.i+1;
-            while data.lcp[self.j] >= remaining as isize {
-                self.j += 1;
-            }
-            //      construct new block
-            println!("block: {}..{}", self.i, self.j);
-            self.block = Some(
-                Block::new(
-                    &data.id[self.i..self.j], 
-                    &data.pos[self.i..self.j], 
-                    &data.seq_pos, 
-                    &data.rc_rank)
-            );
-            // self.idx = Some(vec![0; self.j - self.i]);
-            // self.rcr = Vec::new();
-            // for k in self.i..self.j { 
-            //     self.rcr.push(data.rc_rank[data.id[k]][0]) 
-            // }
+        let tmp = Block::get_block_at(self.data, block.end);
+        if tmp.is_none() { return None; }
+        *block = tmp.unwrap();
+        return block.next();
+    }
+}
+
+struct Block<'a> {
+     data: &'a PFData,
+    start: usize,       // start of a block (inclusive)
+      end: usize,       //   end of a block (exclusive)
+      idx: Vec<usize>,  // index of smallest rank at position start + i
+     rank: Vec<usize>,  // smalles rank at position start + i
+}
+
+impl<'a> Block<'a> {
+    fn get_block_at(data: &'a PFData, mut start: usize) -> Option<Block<'a>> {
+        if start >= data.sa.len() { return None; }
+
+        let mut remaining = data.seg_len[data.id[start]] - data.pos[start];
+        while remaining <= data.overlap { 
+            start += 1; 
+            remaining = data.seg_len[data.id[start]] - data.pos[start];
         }
 
-        let block = self.block.unwrap();
-        let result = block.next();
-        return result;
-        // let k = argmin(&self.rcr);
-        // // if self.rcr[k] == usize::MAX { return None; }
-        // let Some(idx) = self.idx;
-        // let result = (
-        //     data.seq_pos[data.id[k]][idx[k]] + data.pos[k],
-        //     data.id[k],
-        //     data.pos[k]
-        // );
-        //
-        // // self.idx[k] += 1;
-        // let val = data.rc_rank[data.id[k]].get(idx[k]);
-        // match val {
-        //     None => { self.rcr[k] = usize::MAX; },
-        //     Some(v) => { self.rcr[k] = *v; }
-        // }
-        //
-        // return Some(result);
+        let mut end = start + 1;
+        while data.lcp[end] >= remaining as isize {
+            end += 1;
+        }
 
-        // if self.processing == None {
-        //     let remaining = data.seg_len[data.id[i]] - data.pos[i];
-        //     if remaining <= data.overlap { i += 1; continue; }
-        //     let mut j = i+1;
-        //     while data.lcp[j] >= remaining as isize { j += 1; }
+        let idx = vec![0; end-start];
 
-        //     let block = Block::new(&data.id[i..j], &data.pos[i..j], &data.seq_pos, &data.rc_rank);
+        let mut rank = Vec::new();
+        for id in &data.id[start..end] {
+            rank.push(data.rc_rank[*id][0]);
+        }
 
-        // }
+        return Some(Block{data, start, end, idx, rank});
+    }
+}
 
-        // return block.next(); 
-        // i = j;
+impl<'a> Iterator for Block<'a> {
+    type Item = (usize, usize, usize);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let k = argmin(&self.rank);
+        if self.rank[k] == usize::MAX { return None; }
+
+        let data = self.data;
+        let result = (
+            data.seq_pos[data.id[self.start + k]][self.idx[k]] + data.pos[self.start + k],
+            data.id[self.start + k],
+            data.pos[self.start + k]
+        );
+
+        self.idx[k] += 1;
+        match data.rc_rank[data.id[self.start + k]].get(self.idx[k]) {
+            Some(val) => { self.rank[k] = *val; },
+            None      => { self.rank[k] = usize::MAX; }
+        }
+        return Some(result);
     }
 }
 
@@ -271,56 +259,6 @@ fn argsort(data: &[usize]) -> Vec<usize> {
     let v: Vec<usize> = v.iter().map(|(_, i)| *i).collect();
     let v = permutation_invert(&v);
     return v;
-}
-
-struct Block<'a> {
-         id: &'a[usize],
-        pos: &'a[usize],
-    seq_pos: &'a[Vec<usize>],
-    rc_rank: &'a[Vec<usize>],
-        idx: Vec<usize>,
-        rcr: Vec<usize>
-}
-
-impl<'a> Block<'a> {
-    fn new(
-        id: &'a[usize], pos: &'a[usize], 
-        seq_pos: &'a[Vec<usize>], rc_rank: &'a[Vec<usize>]
-    ) -> Block<'a> {
-
-        let mut rcr = Vec::new();
-        for i in id {
-            rcr.push(rc_rank[*i][0]);
-        }
-        Block { 
-            id, pos, seq_pos, rc_rank, 
-            idx: vec![0; id.len()],
-            rcr
-        }
-    }
-}
-
-impl<'a> Iterator for Block<'a> {
-    type Item = (usize, usize, usize);
-
-    fn next(&mut self) -> Option<Self::Item> {
-        let k = argmin(&self.rcr);
-        if self.rcr[k] == usize::MAX { return None; }
-        let result = (
-            self.seq_pos[self.id[k]][self.idx[k]] + self.pos[k],
-            self.id[k],
-            self.pos[k]
-        );
-
-        self.idx[k] += 1;
-        let val = self.rc_rank[self.id[k]].get(self.idx[k]);
-        match val {
-            None => { self.rcr[k] = usize::MAX; },
-            Some(v) => { self.rcr[k] = *v; }
-        }
-
-        return Some(result);
-    }
 }
 
 fn argmin(data: &[usize]) -> usize {
