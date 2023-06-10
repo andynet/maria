@@ -25,19 +25,18 @@ Modified by Gogis to output the SLP in a plain format
 
 */
 
-#include <stdlib.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
-#include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/types.h>
 #include <unistd.h>
 
-typedef struct
-  { unsigned int left,right;
-  } Tpair;
+typedef struct {
+    unsigned int left, right;
+} Tpair;
 
 long u; // |text| and later current |C| with gaps
-
 
 unsigned int alph; // size of terminal alphabet, or smallest non terminal symbol
 
@@ -50,86 +49,89 @@ char *ff;
 FILE *f;
 
 void print_rule(unsigned int i, FILE *f) {
-    fprintf(f, "%u %u\n", R[i-alph].left, R[i-alph].right);
+  fprintf(f, "%u %u\n", R[i - alph].left, R[i - alph].right);
 }
 
-int main (int argc, char **argv)
+int main(int argc, char **argv)
 
-   { char fname[1024]; char outname[1024];
-     //char *text;
-     size_t len;
-     FILE *Tf,*Rf,*Cf;
-     struct stat s;
-     fputs("==== Command line:\n",stderr);
-     for(int i=0;i<argc;i++)
-       fprintf(stderr," %s",argv[i]);
-     fputs("\n",stderr);     
-     if (argc != 2)
-  { fprintf (stderr,"Usage: %s <filename>\n"
-        "Generate <filename>.plainslp from its .C and .R "
-        "extensions.\n"
-        "This is a version for prefix-free parsing\n",argv[0]);
+{
+  char fname[1024];
+  char outname[1024];
+  // char *text;
+  size_t len;
+  FILE *Tf, *Rf, *Cf;
+  struct stat s;
+  fputs("==== Command line:\n", stderr);
+  for (int i = 0; i < argc; i++)
+    fprintf(stderr, " %s", argv[i]);
+  fputs("\n", stderr);
+  if (argc != 2) {
+    fprintf(stderr,
+            "Usage: %s <filename>\n"
+            "Generate <filename>.plainslp from its .C and .R "
+            "extensions.\n"
+            "This is a version for prefix-free parsing\n",
+            argv[0]);
     exit(1);
   }
-  
+
   // read .R file, store data in alpha and R[]
-     strcpy(fname,argv[1]);
-     strcat(fname,".R");
-     if (stat (fname,&s) != 0)
-  { fprintf (stderr,"Error: cannot stat file %s\n",fname);
+  strcpy(fname, argv[1]);
+  strcat(fname, ".R");
+  if (stat(fname, &s) != 0) {
+    fprintf(stderr, "Error: cannot stat file %s\n", fname);
     exit(1);
   }
-     len = s.st_size;
-     Rf = fopen (fname,"r");
-     if (Rf == NULL)
-  { fprintf (stderr,"Error: cannot open file %s for reading\n",fname);
+  len = s.st_size;
+  Rf = fopen(fname, "r");
+  if (Rf == NULL) {
+    fprintf(stderr, "Error: cannot open file %s for reading\n", fname);
     exit(1);
   }
-     if (fread(&alph,sizeof(int),1,Rf) != 1)
-  { fprintf (stderr,"Error: cannot read file %s\n",fname);
+  if (fread(&alph, sizeof(int), 1, Rf) != 1) {
+    fprintf(stderr, "Error: cannot read file %s\n", fname);
     exit(1);
   }
   // note that in the original char-based repair the R file contains also
   // a map between the 0...alph-1 and the actual symbols in the input file
   // here alph is 256 and there is no such map (this is why the two .R .C
   // formats are not compatible).
-  
-     // n is the number of rules, sizeof(int) accounts for alpha
-     n = (len-sizeof(int))/sizeof(Tpair);
-     // allocate and read array of rules stored as pairs 
-     R = (void*)malloc(n*sizeof(Tpair));
-     if (fread(R,sizeof(Tpair),n,Rf) != n)
-  { fprintf (stderr,"Error: cannot read file %s\n",fname);
-    exit(1);
-  }
-     fclose(Rf);
 
-   // open C file and get the nuber of symbols in it 
-     strcpy(fname,argv[1]);
-     strcat(fname,".C");
-     if (stat (fname,&s) != 0)
-  { fprintf (stderr,"Error: cannot stat file %s\n",fname);
+  // n is the number of rules, sizeof(int) accounts for alpha
+  n = (len - sizeof(int)) / sizeof(Tpair);
+  // allocate and read array of rules stored as pairs
+  R = (void *)malloc(n * sizeof(Tpair));
+  if (fread(R, sizeof(Tpair), n, Rf) != n) {
+    fprintf(stderr, "Error: cannot read file %s\n", fname);
     exit(1);
   }
-     Cf = fopen (fname,"r");
-     if (Cf == NULL)
-  { fprintf (stderr,"Error: cannot open file %s for reading\n",fname);
+  fclose(Rf);
+
+  // open C file and get the nuber of symbols in it
+  strcpy(fname, argv[1]);
+  strcat(fname, ".C");
+  if (stat(fname, &s) != 0) {
+    fprintf(stderr, "Error: cannot stat file %s\n", fname);
+    exit(1);
+  }
+  Cf = fopen(fname, "r");
+  if (Cf == NULL) {
+    fprintf(stderr, "Error: cannot open file %s for reading\n", fname);
     exit(1);
   }
 
   // open output file
-     strcpy(outname,argv[1]);
-     strcat(outname,".plainslp");
-     Tf = fopen (outname,"w");
-     if (Tf == NULL)
-  { fprintf (stderr,"Error: cannot open file %s for writing\n",outname);
+  strcpy(outname, argv[1]);
+  strcat(outname, ".plainslp");
+  Tf = fopen(outname, "w");
+  if (Tf == NULL) {
+    fprintf(stderr, "Error: cannot open file %s for writing\n", outname);
     exit(1);
   }
 
   for (int i = 0; i < n; i++) {
-    print_rule(alph+i, Tf);
+    print_rule(alph + i, Tf);
   }
   fclose(Tf);
- return 0;
+  return 0;
 }
-

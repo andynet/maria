@@ -12,7 +12,7 @@ tar -xvzf moni-0.2.0-Linux.tar.gz
 
 ## How to get it running
 ```
-git clone git@gitlab.com:manzai/bigrepair.git
+git clone https://gitlab.com/manzai/bigrepair.git
 cd bigrepair
 make
 ```
@@ -25,8 +25,8 @@ cc -Wall -g -O9    print_plain_slp.c   -o print_plain_slp
 
 ## Usage
 ```
-./bigrepair/bigrepair data/grammar/tiny
-./print_plain_slp data/grammar/tiny
+./tools/bigrepair/bigrepair data/grammar/tiny
+./scripts/print_plain_slp data/grammar/tiny
 ```
 There are 256 terminals in the grammar representing the char values 0-255. The terminal for the char `x` is associated with the identifier of `x`.
 Since not all of the terminals are printable and may cause formatting problems (e.g. `\n`), they are ommited from the plaintext output.
