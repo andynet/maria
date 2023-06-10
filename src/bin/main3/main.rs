@@ -10,6 +10,7 @@ use std::usize;
 mod gp;
 mod pred;
 mod pf;
+mod grammar;
 
 use gp::GraphPos as GraphPos;
 use pred::Predecessor;
