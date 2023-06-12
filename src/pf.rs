@@ -1,8 +1,13 @@
 use bio::data_structures::suffix_array::lcp as lcp_array;
+use gfa::gfa::GFA;
+use std::io::Write;
+use std::io;
+use std::fs;
+use std::collections::HashMap;
 use gfa::gfa::Path;
 use gfa::gfa::Segment;
 use gfa::parser::GFAParser;
-use maria::arrays::SuffixArray;
+use crate::arrays::SuffixArray;
 use std::ops::Add;
 use std::str;
 
@@ -36,16 +41,8 @@ pub struct PFDataIterator<'a> {
 }
 
 impl PFData {
-    pub fn from_pfgraph(filename: &str) -> Self {
-        let parser: GFAParser<usize, ()> = GFAParser::new();
-        let gfa = parser.parse_file(filename)
-            .expect("Error parsing GFA file.");
-
-        let overlap = 1; // TODO
-        let segments: Vec<Vec<u8>> = parse_segments(&gfa.segments);
-        let paths: Vec<Vec<usize>> = parse_paths(&gfa.paths);
-
-        let segment_join = join(&segments);
+    pub fn new(segments: &[Vec<u8>], paths: &[Vec<usize>], overlap: usize) -> Self {
+        let segment_join = join(segments);
 
         let sa  = SuffixArray::create(&*segment_join);
         let lcp = lcp_array(&segment_join, &sa).decompress();
@@ -53,11 +50,11 @@ impl PFData {
         let id  = get_node_ids(&segment_join, &isa);
         let pos = get_node_pos(&segment_join, &isa);
 
-        let path_join = join(&paths);
+        let path_join = join(paths);
 
-        let len = get_lengths(&segments);
+        let seg_len = get_lengths(segments);
         let mut rc_rank = get_right_context_rank(&path_join, segments.len());
-        let mut seq_pos = get_sequence_position(&path_join, &len, overlap);
+        let mut seq_pos = get_sequence_position(&path_join, &seg_len, overlap);
 
         for i in 0..segments.len() {
             let iperm = argsort(&rc_rank[i]);
@@ -67,9 +64,21 @@ impl PFData {
 
         Self{
             segment_join, sa, lcp, id, pos,
-            path_join, seg_len: len, seq_pos, rc_rank,
+            path_join, seg_len, seq_pos, rc_rank,
             overlap 
         }
+    }
+
+    pub fn from_pfgraph(filename: &str) -> Self {
+        let parser: GFAParser<usize, ()> = GFAParser::new();
+        let gfa = parser.parse_file(filename)
+            .expect("Error parsing GFA file.");
+
+        let overlap = 1; // TODO determine_overlap();
+        let segments: Vec<Vec<u8>> = parse_segments(&gfa.segments);
+        let paths: Vec<Vec<usize>> = parse_paths(&gfa.paths);
+
+        Self::new(&segments, &paths, overlap)
     }
 
     pub fn iter(&self) -> PFDataIterator {
@@ -298,5 +307,111 @@ fn argmin(data: &[usize]) -> usize {
         if v < min_val { min_pos = p; min_val = v; }
     }
     return min_pos;
+}
+
+pub fn get_triggers(trigs: &[u8], size: usize) -> Vec<&[u8]> {
+    let mut result = Vec::new();
+    for i in (0..trigs.len()).step_by(size+1) {
+        result.push(&trigs[i..i+size]);
+    }
+    return result;
+}
+
+pub fn load_trigs(filename: &str) -> (Vec<u8>, usize) {
+    let trigs = fs::read_to_string(filename)
+        .expect("Unable to read the triggers file")
+        .trim().as_bytes().to_owned();
+
+    let trigs_size;
+    match trigs.iter().position(|&x| x == b'\n') {
+        None    => { trigs_size = trigs.len(); },
+        Some(x) => { trigs_size = x; }
+    }
+    return (trigs, trigs_size);
+}
+
+pub fn normalize(segments: HashMap<Vec<u8>, usize>, mut paths: Vec<Vec<usize>>)
+    -> (Vec<Vec<u8>>, Vec<Vec<usize>>) 
+{
+    let mut segments: Vec<_> = segments.into_iter().collect();
+    segments.sort_unstable();
+
+    let mut mapping = vec![0; segments.len()];
+    for (i, (_, id)) in segments.iter().enumerate() { mapping[*id] = i; }
+
+    for (_, id) in segments.iter_mut() { *id = mapping[*id]; }
+    for path in paths.iter_mut() {
+        for id in path { *id = mapping[*id]; }
+    }
+
+    let segments = segments.iter().map(|x| x.0.clone() ).collect();
+
+    return (segments, paths);
+}
+
+fn add_segment(
+         seq: &[u8],
+    segments: &mut HashMap<Vec<u8>, usize>,
+        path: &mut Vec<usize>
+) {
+    let segment_id = segments.get(seq);
+    match segment_id {
+        Some(&id) => { path.push(id); },
+        None => {
+            path.push(segments.len());
+            segments.insert(seq.to_owned(), segments.len());
+        }
+    }
+}
+
+pub fn split_prefix_free(
+         seq: &[u8],    // must end with sentinel
+    triggers: &[&[u8]], // must be non-empty
+    segments: &mut HashMap<Vec<u8>, usize>,
+       paths: &mut Vec<Vec<usize>>
+) {
+    let n = seq.len();
+    let k = triggers.first().expect("No triggers found.").len();
+
+    let mut path = Vec::new();
+    let mut i = 0;
+    for j in 1..n-k {
+        if triggers.contains(&&seq[j..j+k]) {
+            let segment_seq = &seq[i..j+k];
+            add_segment(segment_seq, segments, &mut path);
+            i = j;
+        }
+    }
+    add_segment(&seq[i..n], segments, &mut path);
+    paths.push(path);
+}
+
+pub fn reconstruct_path(path: &Path<usize, ()>, gfa: &GFA<usize, ()>) -> Vec<u8> {
+    // TODO: 
+    Vec::new()
+}
+
+pub fn print_gfa<T: Write>(
+      segments: &Vec<Vec<u8>>,
+         paths: &Vec<Vec<usize>>,
+             k: usize,  // size of the trigger words
+    mut output: T
+) -> io::Result<()> {
+
+    writeln!(output, "H\tVN:Z:1.1")?;
+    for (id, seq) in segments.iter().enumerate() {
+        let seq = str::from_utf8(seq).expect("Cannot convert seq to UTF8");
+        writeln!(output, "S\t{}\t{}", id, seq)?;
+    }
+
+    for (i, path) in paths.iter().enumerate() {
+        let path_str = path.iter().map(|x| format!("{}+", x)).collect::<Vec<_>>().join(",");
+        writeln!(output, "P\t{}\t{}\t*", i, path_str)?;
+
+        for j in 0..path.len()-1 {
+            writeln!(output, "L\t{}\t+\t{}\t+\t{}M", path[j], path[j+1], k)?;
+        }
+    }
+    return Ok(());
 }
 

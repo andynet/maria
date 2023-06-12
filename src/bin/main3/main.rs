@@ -1,19 +1,16 @@
-use bio::data_structures::suffix_array::lcp as lcp_array;
 use clap::Parser;
 use gfa::gfa::GFA;
 use gfa::parser::GFAParser;
-use maria::arrays::SuffixArray;
 use std::collections::HashMap;
 use std::str;
 use std::usize;
+use maria::pf;
 
 mod gp;
 mod pred;
-mod pf;
 mod grammar;
 
 use gp::GraphPos as GraphPos;
-use pred::Predecessor;
 use grammar::Grammar;
 
 /// Find MEMs in a graph
@@ -23,6 +20,9 @@ struct Args {
     /// GFA file
     #[arg(short)]
     gfa_filename: String,
+    /// Trigger file used for prefix-free suffix array construction
+    #[arg(short)]
+    trigger_filename: String,
     /// MEMs file
     #[arg(short)]
     mems_filename: String,
@@ -34,12 +34,32 @@ struct Args {
 fn main() {
     let args = Args::parse();
 
-    let (start, graph_pos) = parse_graph("data/pftag/test_arbitrary.gfa");
+    let parser: GFAParser<usize, ()> = GFAParser::new();
+    let graph = parser.parse_file(args.gfa_filename)    // "data/pftag/test_arbitrary.gfa"
+        .expect("Error parsing GFA file.");
 
-    // let (sampled_sa, sampled_tag) = tag_array(
-    //     "data/pftag/test_arbitrary.gfa",
-    //     "../../../data/pftag/triggers.txt"
-    // );
+    let (start, graph_pos) = parse_graph(&graph);
+
+    let (trigs, trigs_size) = pf::load_trigs(&args.trigger_filename);
+    let triggers = pf::get_triggers(&trigs, trigs_size);
+
+    let mut segments = HashMap::new();
+    let mut paths = Vec::new();
+
+    for path in &graph.paths {
+        let mut seq = pf::reconstruct_path(path, &graph);
+        let v = vec![b'.'; trigs_size];
+        seq.extend_from_slice(&v);
+        pf::split_prefix_free(&seq, &triggers, &mut segments, &mut paths);
+    }
+
+    let (segments, paths) = pf::normalize(segments, paths);
+
+    let pfdata = pf::PFData::new(&segments, &paths, trigs_size);
+
+    for (sa, id, pos) in pfdata.iter() {
+        println!("{sa}\t{id}\t{pos}");
+    }
 
     let grammar = Grammar::from_file("data/pftag/test_join.txt.plainslp");
 
@@ -47,11 +67,7 @@ fn main() {
     //      
 }
 
-fn parse_graph(graph_file: &str) -> (Vec<usize>, Vec<GraphPos>) {
-    let parser: GFAParser<usize, ()> = GFAParser::new();
-    let graph = parser.parse_file(graph_file)
-        .expect("Error parsing GFA file.");
-
+fn parse_graph(graph: &GFA<usize, ()>) -> (Vec<usize>, Vec<GraphPos>) {
     let mut len = HashMap::new();
     for seg in &graph.segments { len.insert(seg.name, seg.sequence.len()); }
 
