@@ -61,10 +61,10 @@ fn test_arbitrary() {
     let arbitrary_graph = parser.parse_file("data/pftag/test_arbitrary.gfa")
         .expect("Error parsing GFA file.");
 
-    let (seq_pos, graph_pos) = parse_graph(&arbitrary_graph);
+    // let (seq_pos, graph_pos) = parse_graph(&arbitrary_graph);
 
-    for i in 0..seq_pos.len() {
-        println!("{}\t{}", seq_pos[i], graph_pos[i].node_id);
-    }
+    // for i in 0..seq_pos.len() {
+    //     println!("{}\t{}", seq_pos[i], graph_pos[i].node_id);
+    //}
 }
 

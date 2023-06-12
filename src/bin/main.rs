@@ -1,7 +1,7 @@
 use gfa::parser::GFAParser;
 use gfa::gfa::{Path, SegmentId};
 use gfa::optfields::*;
-use maria::{create_map,create_sequence,inverse_suffix_array,tag_array};
+use maria::naive::{create_map,create_sequence,inverse_suffix_array,tag_array};
 use bio::data_structures::suffix_array::suffix_array;
 use std::str;
 use std::str::FromStr;

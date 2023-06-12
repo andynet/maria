@@ -8,6 +8,7 @@ use std::str;
 
 /// Data required to iterate through suffix array in sublinear space
 pub struct PFData {
+    segment_join: Vec<u8>,
     /// suffix array of segment join
      sa: Vec<usize>, 
     /// longest common prefix of segment join
@@ -17,6 +18,7 @@ pub struct PFData {
     /// position in the segment associated with suffix array
     pos: Vec<usize>,
 
+    path_join: Vec<usize>,
     /// length of segments
     seg_len: Vec<usize>,
     /// starting positions of a segment in expanded path join
@@ -39,7 +41,7 @@ impl PFData {
         let gfa = parser.parse_file(filename)
             .expect("Error parsing GFA file.");
 
-        let overlap = 1;
+        let overlap = 1; // TODO
         let segments: Vec<Vec<u8>> = parse_segments(&gfa.segments);
         let paths: Vec<Vec<usize>> = parse_paths(&gfa.paths);
 
@@ -63,7 +65,11 @@ impl PFData {
             seq_pos[i] = permutation_apply(&iperm, &seq_pos[i]);
         }
 
-        Self{ sa, lcp, id, pos, seg_len: len, seq_pos, rc_rank, overlap } 
+        Self{
+            segment_join, sa, lcp, id, pos,
+            path_join, seg_len: len, seq_pos, rc_rank,
+            overlap 
+        }
     }
 
     pub fn iter(&self) -> PFDataIterator {
@@ -74,6 +80,31 @@ impl PFData {
             data: self,
             block
         }
+    }
+
+    pub fn print(&self) {
+        let mut segment_join_repr = self.segment_join.clone();
+        for c in segment_join_repr.iter_mut() {
+            match *c {
+                0   => { *c = b'$'; },
+                1   => { *c = b'#'; },
+                2.. => { *c -= 2; }
+            }
+        }
+        for i in 0..self.sa.len() {
+            println!("{}\t{}\t{}\t{}\t{}\t{}", 
+                i, self.sa[i], self.lcp[i], self.id[i], self.pos[i],
+                str::from_utf8(&segment_join_repr[self.sa[i]..]).unwrap()
+            );
+        }
+        println!();
+
+        for id in 0..self.seg_len.len() {
+            println!("{}\t{}\t{:?}\t{:?}", 
+                id, self.seg_len[id], self.seq_pos[id], self.rc_rank[id]
+            );
+        }
+        println!();
     }
 }
 
