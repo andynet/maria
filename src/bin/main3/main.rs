@@ -9,6 +9,7 @@ use maria::pf;
 mod gp;
 mod pred;
 mod grammar;
+mod mem;
 
 use gp::GraphPos as GraphPos;
 use grammar::Grammar;
@@ -57,14 +58,26 @@ fn main() {
 
     let pfdata = pf::PFData::new(&segments, &paths, trigs_size);
 
-    for (sa, id, pos) in pfdata.iter() {
-        println!("{sa}\t{id}\t{pos}");
+    let mut tag = Vec::new();
+    for (sa, _, _) in pfdata.iter() {
+        let i = start.argpred(sa);
+        let gpos = &graph_pos[i];
+        tag.push((sa, gpos.node_id, gpos.direction.clone(), sa - i));
     }
 
     let grammar = Grammar::from_file("data/pftag/test_join.txt.plainslp");
 
-    // for MEM in MEMs:
-    //      
+    // let mems = MEMReader::new(&args.mems_filename, &args.ptr_filename);
+    // for mem in mems {
+    //
+    //     let gp: Vec<GraphPos> = get_graph_positions(&seq, &ref_mem, &stag, &ssa);
+    //     for gpos in gp {
+    //         let (node_id, sign): (String, char) = parse_node_id(gpos.node_id);
+    //         println!("{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}",
+    //             read_id, mem.0, adj, ref_pos, mem.1, node_id, sign, gpos.pos
+    //         )
+    //     }
+    // }
 }
 
 fn parse_graph(graph: &GFA<usize, ()>) -> (Vec<usize>, Vec<GraphPos>) {
@@ -87,6 +100,18 @@ fn parse_graph(graph: &GFA<usize, ()>) -> (Vec<usize>, Vec<GraphPos>) {
     }
 
     return (start, result);
+}
+
+trait Predecessor {
+    fn argpred(&self, item: usize) -> usize;
+}
+
+impl Predecessor for Vec<usize> {
+    fn argpred(&self, item: usize) -> usize {
+        let mut i = self.len() - 1;
+        while self[i] > item { i -= 1; }
+        return i;
+    }
 }
 
 #[cfg(test)]

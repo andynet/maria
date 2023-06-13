@@ -3,6 +3,8 @@ use gfa::optfields::*;
 use std::collections::HashMap;
 use std::hash::Hash;
 
+use crate::reverse_complement;
+
 fn parse_segments(s: &[u8]) -> Vec<(Vec<u8>, u8)> {
     let mut start = 0;
     let mut segments = Vec::new();
@@ -18,22 +20,6 @@ fn parse_segments(s: &[u8]) -> Vec<(Vec<u8>, u8)> {
     let sign = s[s.len()-1];
     segments.push((name, sign));
     return segments;
-}
-
-fn reverse_complement(s: &[u8]) -> Vec<u8> {
-    let n = s.len();
-    let mut result = vec![0; n];
-    for (i, c) in s.iter().enumerate() {
-        match *c {
-            b'A' => { result[n-1-i] = b'T'; },
-            b'C' => { result[n-1-i] = b'G'; },
-            b'G' => { result[n-1-i] = b'C'; },
-            b'T' => { result[n-1-i] = b'A'; },
-            b'N' => { result[n-1-i] = b'N'; },
-            _ => { panic!("Unexpected letter in s."); }
-        }
-    }
-    return result;
 }
 
 fn get_sequence(

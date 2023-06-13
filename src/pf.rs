@@ -10,6 +10,7 @@ use gfa::parser::GFAParser;
 use crate::arrays::SuffixArray;
 use std::ops::Add;
 use std::str;
+use crate::reverse_complement;
 
 /// Data required to iterate through suffix array in sublinear space
 pub struct PFData {
@@ -386,9 +387,33 @@ pub fn split_prefix_free(
     paths.push(path);
 }
 
+fn into_path_step(step: &str) -> (usize, u8) {
+    let n = step.len();
+    let id = step[0..n-1].parse::<usize>().expect("Cannot parse path.");
+    let sign = step[n-1..n].parse::<u8>().expect("Cannot parse path.");
+    return (id, sign);
+}
+
 pub fn reconstruct_path(path: &Path<usize, ()>, gfa: &GFA<usize, ()>) -> Vec<u8> {
-    // TODO: 
-    Vec::new()
+    let mut result = Vec::new();
+
+    let mut map = HashMap::new();
+    for segment in &gfa.segments {
+        map.insert(segment.name, segment.sequence.clone());
+    }
+
+    let p = str::from_utf8(&path.segment_names).unwrap();
+    let p: Vec<_> = p.split(',').map(into_path_step).collect();
+
+    for (id, sign) in p {
+        let sequence = map.get(&id).expect("Segment not found");
+        match sign {
+            b'+' => { result.extend_from_slice(&sequence) },
+            b'-' => { result.extend_from_slice(&reverse_complement(&sequence)) },
+            x    => { panic!("Unexpected direction {x}") }
+        }
+    } 
+    return result;
 }
 
 pub fn print_gfa<T: Write>(
