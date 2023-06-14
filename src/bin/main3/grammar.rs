@@ -48,9 +48,7 @@ impl Grammar {
         Grammar { root: left.len() - 1, left, right, sizes, terminals}
     }
 
-    pub fn len(&self) -> usize {
-        self.sizes[self.root] - 1 // subtract newline
-    }
+    pub fn len(&self) -> usize { self.sizes[self.root] }
 
 }
 

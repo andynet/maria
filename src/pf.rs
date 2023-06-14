@@ -388,9 +388,8 @@ pub fn split_prefix_free(
 }
 
 fn into_path_step(step: &str) -> (usize, u8) {
-    let n = step.len();
-    let id = step[0..n-1].parse::<usize>().expect("Cannot parse path.");
-    let sign = step[n-1..n].parse::<u8>().expect("Cannot parse path.");
+    let id = step[0..step.len()-1].parse::<usize>().expect("Cannot parse path.");
+    let sign = step.bytes().last().unwrap();
     return (id, sign);
 }
 
@@ -440,3 +439,14 @@ pub fn print_gfa<T: Write>(
     return Ok(());
 }
 
+#[cfg(test)]
+mod tests {
+    use super::into_path_step;
+    #[test]
+    fn into_iter_works() {
+        let s = "2+";
+        let res = into_path_step(s);
+        assert_eq!(res, (2, b'+'));
+    }
+
+}

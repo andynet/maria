@@ -21,17 +21,20 @@ use mem::MEMReader;
 #[command(author, version, about)]
 struct Args {
     /// GFA file
-    #[arg(short)]
+    #[arg(short = 'f')]
     gfa_filename: String,
-    /// Trigger file used for prefix-free suffix array construction
-    #[arg(short)]
-    trigger_filename: String,
     /// MEMs file
     #[arg(short)]
     mems_filename: String,
     /// pointers
     #[arg(short)]
     ptr_filename: String,
+    /// grammar file
+    #[arg(short)]
+    grammar_filename: String,
+    /// Trigger file used for prefix-free suffix array construction
+    #[arg(short)]
+    trigger_filename: String,
 }
 
 fn main() {
@@ -69,7 +72,7 @@ fn main() {
         sampled_sa.push(sa);
     }
 
-    let grammar = Grammar::from_file("data/pftag/test_join.txt.plainslp");
+    let grammar = Grammar::from_file(&args.grammar_filename);
 
     let mem_reader = MEMReader::new(&args.mems_filename, &args.ptr_filename);
     for (read_id, mems) in mem_reader {
@@ -170,7 +173,7 @@ fn lce(grammar: &Grammar, s1: usize, s2: usize) -> (usize, bool) {
     if s2+l == n { return (l, false); }
     if grammar[s1+l] < grammar[s2+l] { return (l, true); }
     if grammar[s1+l] > grammar[s2+l] { return (l, false); }
-    panic!();
+    panic!("Incorrect grammar is used.");
 }
 
 use std::collections::HashSet;
