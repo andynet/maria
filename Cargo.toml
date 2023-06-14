@@ -8,3 +8,5 @@ bio = "*"
 clap = { version = "4.2.7", features = ["derive"] }
 gfa = "*"
 
+[dev-dependencies]
+proptest = "1.2.0"
