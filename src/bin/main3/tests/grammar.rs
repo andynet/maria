@@ -14,6 +14,20 @@ fn test() {
     println!();
 }
 
+#[test]
+fn test_my_grammar() {
+    let s = b"TGACGGGCAGT".to_owned();
+    let g = Grammar::from_bytes(&s);
+
+    assert_eq!(g.len(), s.len());
+    for i in 0..g.len() {
+        assert_eq!(g[i], s[i]);
+    }
+
+    let output = File::create("data/temporary/seq.txt").expect("Cannot create file.");
+    g.print(output);
+}
+
 fn test_grammar_for_string(s: &[u8]) {
     {
         let mut out = File::create("data/temporary/seq.txt").expect("Cannot create file.");

@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::ops::Index;
 use std::fs::File;
 use std::io::{prelude::*, BufReader};
@@ -48,8 +49,68 @@ impl Grammar {
         Grammar { root: left.len() - 1, left, right, sizes, terminals}
     }
 
-    pub fn len(&self) -> usize { self.sizes[self.root] }
+    pub fn from_bytes(s: &[u8]) -> Self {
+        let s: Vec<_> = s.iter().map(|&x| x as usize).collect();
+        let mut rule_id: HashMap<(usize, usize), usize> = HashMap::new();
+        let mut id = 256;
 
+        let mut v1 = s;
+        let mut v2 = Vec::new();
+        while v1.len() > 1 {
+            let n = (v1.len() / 2) * 2; // continuing with even lengths only
+            for i in (0..n).step_by(2) {
+                let rule = rule_id.get(&(v1[i], v1[i+1]));
+                match rule {
+                    None => { 
+                        rule_id.insert((v1[i], v1[i+1]), id);
+                        v2.push(id);
+                        id += 1;
+                    }
+                    Some(&id) => {
+                        v2.push(id);
+                    }
+                }
+            }
+            if v1.len() > n { v2.push(*v1.last().unwrap()) }
+            v1 = v2;
+            v2 = Vec::new();
+        }
+        // println!("{:?}", rule_id);
+        let mut g: Vec<_> = rule_id.iter().map(|(k, v)| (*v, *k)).collect();
+        g.sort_unstable();
+        println!("{:?}", g);
+
+        let mut left = Vec::new();
+        let mut right = Vec::new();
+        let mut sizes = Vec::new();
+        for (_, (l, r)) in g {
+            left.push(l);
+            right.push(r);
+
+            let left_size;
+            if l < NTERM { left_size = 1; }
+            else { left_size = sizes[l - NTERM] }
+
+            let right_size;
+            if r < NTERM { right_size = 1; }
+            else { right_size = sizes[r - NTERM]; }
+
+            sizes.push(left_size + right_size);
+        }
+
+        let max_term = (NTERM - 1) as u8;
+        let terminals = (0..=max_term).collect();
+        Grammar { root: left.len() - 1, left, right, sizes, terminals }
+    }
+
+    pub fn print<T: Write>(&self, mut output: T) {
+        for i in 0..self.left.len() {
+            writeln!(output, "{} {}", self.left[i], self.right[i])
+                .expect("Error writting to file.");
+        }
+    }
+
+    pub fn len(&self) -> usize { self.sizes[self.root] }
 }
 
 impl Index<usize> for Grammar {
