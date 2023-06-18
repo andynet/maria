@@ -1,7 +1,6 @@
 use clap::Parser;
 use gfa::gfa::GFA;
 use gfa::parser::GFAParser;
-use gp::Direction;
 use std::collections::HashMap;
 use std::str;
 use std::usize;
@@ -67,7 +66,7 @@ fn main() {
     let mut sampled_sa = Vec::new();
     for (sa, _, _) in pfdata.iter() {
         let i = start.argpred(sa);
-        let graph_position = GraphPos{pos: sa - i, ..graph_pos[i]};
+        let graph_position = GraphPos{pos: sa - start[i], ..graph_pos[i]};
         sampled_tag.push(graph_position);
         sampled_sa.push(sa);
     }
