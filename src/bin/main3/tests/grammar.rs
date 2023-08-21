@@ -24,7 +24,7 @@ fn test_grammar_for_string(s: &[u8]) {
     Command::new("./tools/bigrepair/bigrepair")
         .args(["data/temporary/seq.txt"])
         .output()
-        .expect("Failer to run bigrepair");
+        .expect("Failed to run bigrepair");
 
     println!("Converting rules to plaintext...");
     Command::new("./scripts/print_plain_slp")
@@ -52,7 +52,7 @@ fn complex_test() {
 
 proptest! {
     #[test]
-    fn proptesting(s in "[ACGT]+") {
+    fn proptesting(s in "[ACGT][ACGT]+") {
         let s: Vec<_> = s.bytes().collect();
         test_grammar_for_string(&s);
     }

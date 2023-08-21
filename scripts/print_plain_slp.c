@@ -119,6 +119,13 @@ int main(int argc, char **argv)
     fprintf(stderr, "Error: cannot open file %s for reading\n", fname);
     exit(1);
   }
+  unsigned int c = s.st_size/sizeof(unsigned int);
+  // open C file and load the symbols into the C array
+  unsigned int *C = (void *)malloc(c * sizeof(unsigned int));
+  if (fread(C, sizeof(unsigned int), c, Cf) != c) {
+    fprintf(stderr, "Error: cannot read file %s\n", fname);
+    exit(1);
+  }
 
   // open output file
   strcpy(outname, argv[1]);
@@ -132,6 +139,25 @@ int main(int argc, char **argv)
   for (int i = 0; i < n; i++) {
     print_rule(alph + i, Tf);
   }
+  unsigned int rule_count = n + alph;
+  // output the rest as dummy rules 
+  while (c > 1) {
+    printf("%u\n", c);
+    for (int j = 0; j < c; j++) {
+        printf("%u ", C[j]);
+    }
+    printf("\n");
+    printf("\n");
+    unsigned int new_c = 0;
+    for (int i = 0; i < c-1; i += 2) {
+        fprintf(Tf, "%u %u\n", C[i], C[i+1]);
+        C[new_c++] = rule_count++;
+    }
+    if (c % 2 == 1) C[new_c++] = C[c-1];
+    c = new_c;
+  }
+  
+  fclose(Cf);
   fclose(Tf);
   return 0;
 }
