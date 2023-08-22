@@ -142,12 +142,6 @@ int main(int argc, char **argv)
   unsigned int rule_count = n + alph;
   // output the rest as dummy rules 
   while (c > 1) {
-    printf("%u\n", c);
-    for (int j = 0; j < c; j++) {
-        printf("%u ", C[j]);
-    }
-    printf("\n");
-    printf("\n");
     unsigned int new_c = 0;
     for (int i = 0; i < c-1; i += 2) {
         fprintf(Tf, "%u %u\n", C[i], C[i+1]);
