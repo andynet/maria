@@ -4,9 +4,10 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-bio = "*"
+pfg = { git = "https://github.com/andynet/pfg", branch = "main"}
 clap = { version = "4.2.7", features = ["derive"] }
 gfa = "*"
+bio = "*"
 
 [dev-dependencies]
 proptest = "1.2.0"

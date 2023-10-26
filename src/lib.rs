@@ -1,6 +1,4 @@
-pub mod arrays;
 pub mod naive;
-pub mod pf;
 
 fn reverse_complement(s: &[u8]) -> Vec<u8> {
     let n = s.len();

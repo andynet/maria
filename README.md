@@ -1,5 +1,3 @@
-https://github.com/plasma-umass/scalene
-
 # MONI installation
 ```
 cd tools

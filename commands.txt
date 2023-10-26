@@ -1,3 +1,9 @@
-cargo run --bin main3 -- -g data/real/SARS-CoV2.5.gfa -t data/pftag/triggers.txt -m data/real/reads_R1.mems -p data/real/reads_R1.pointers
 cargo run --bin main -- -g data/real/SARS-CoV2.5.gfa -m data/real/reads_R1.mems -p data/real/reads_R1.pointers
+cargo run --bin main3 -- -f data/real/SARS-CoV2.5.gfa -t data/pftag/triggers.txt -m data/real/reads_R1.mems -p data/real/reads_R1.pointers -g data/real/SARS-CoV2.5.fnajoin.plainslp
+
+less SARS-CoV2.5.fna | grep -v "^>" | tr -d "\n" > SARS-CoV2.5.fnajoin
+mamba activate maria
+./tools/bigrepair/bigrepair data/real/SARS-CoV2.5.fnajoin
+./scripts/print_plain_slp data/real/SARS-CoV2.5.fnajoin
+
 cargo run --bin main3 -- -f data/real/SARS-CoV2.5.gfa -t data/pftag/triggers.txt -m data/real/reads_R1.mems -p data/real/reads_R1.pointers -g data/real/SARS-CoV2.5.fnajoin.plainslp

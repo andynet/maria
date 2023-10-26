@@ -2,7 +2,7 @@ use bio::io::fasta;
 use clap::Parser;
 use std::collections::HashMap;
 use std::fs::File;
-use maria::pf;
+use pfg::pf;
 
 /// Build prefix-free graph
 #[derive(Parser, Debug)]

@@ -1,4 +1,4 @@
-use maria::pf::PFData;
+use pfg::pf::PFData;
 
 #[test]
 fn iter_works() {
