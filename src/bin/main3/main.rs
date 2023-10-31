@@ -39,29 +39,13 @@ struct Args {
 fn main() {
     let args = Args::parse();
 
-    // get tag array
     let parser: GFAParser<usize, ()> = GFAParser::new();
-    let graph = parser.parse_file(args.gfa_filename)
+    let graph = parser.parse_file(&args.gfa_filename)
         .expect("Error parsing GFA file.");
 
     let (start, graph_pos) = parse_graph(&graph);
 
-    let (trigs, trigs_size) = pfg::pf::load_trigs(&args.trigger_filename);
-    let triggers = pfg::pf::get_triggers(&trigs, trigs_size);
-
-    let mut segments = HashMap::new();
-    let mut paths = Vec::new();
-
-    for path in &graph.paths {
-        let mut seq = pfg::pf::reconstruct_path(path, &graph);
-        let v = vec![b'.'; trigs_size];
-        seq.extend_from_slice(&v);
-        pfg::pf::split_prefix_free(&seq, &triggers, &mut segments, &mut paths);
-    }
-
-    let (segments, paths) = pfg::pf::normalize(segments, paths);
-
-    let pfdata = pfg::pf::PFData::new(&segments, &paths, trigs_size);
+    let pfdata = pfg::pf::PFData::from_graph(&args.gfa_filename, &args.trigger_filename);
 
     let mut sampled_tag = Vec::new();
     let mut sampled_sa = Vec::new();
