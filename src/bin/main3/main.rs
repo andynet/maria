@@ -44,6 +44,10 @@ fn main() {
         .expect("Error parsing GFA file.");
 
     let (start, graph_pos) = parse_graph(&graph);
+    let (path_starts, path_ids) = (
+        vec![0, 29849, 59696, 89512, 119326],
+        vec!["0", "1", "2", "3", "4"]
+    );
 
     let pfdata = pfg::pf::PFData::from_graph(&args.gfa_filename, &args.trigger_filename);
 
@@ -65,10 +69,12 @@ fn main() {
                 &grammar, &mem, &sampled_tag, &sampled_sa
             );
 
-            let ref_id = 0;
+            let i = path_starts.argpred(mem.2);
+            let ref_id = path_ids[i];
+            let pos_in_ref = mem.2 - path_starts[i];
             for gp in graph_positions {
                 println!("{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}",
-                    read_id, mem.1, ref_id, mem.2, mem.0,
+                    read_id, mem.1, ref_id, pos_in_ref, mem.0,
                     gp.id, gp.sign, gp.pos // id, sign, pos
                 )
             }
@@ -104,9 +110,15 @@ trait Predecessor {
 
 impl Predecessor for Vec<usize> {
     fn argpred(&self, item: usize) -> usize {
-        let mut i = self.len() - 1;
-        while self[i] > item { i -= 1; }
-        return i;
+        let mut l = 0;
+        let mut r = self.len();
+
+        while l < r-1 {
+            let m = (l + r) / 2;
+            if item > self[m] { l = m; }
+            else { r = m; }
+        }
+        return l;
     }
 }
 
