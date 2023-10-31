@@ -2,6 +2,7 @@ use clap::Parser;
 use gfa::gfa::GFA;
 use gfa::parser::GFAParser;
 use std::collections::HashMap;
+use std::collections::HashSet;
 use std::str;
 use std::usize;
 use pfg;
@@ -14,6 +15,7 @@ mod mem;
 use gp::GraphPos as GraphPos;
 use grammar::Grammar;
 use mem::MEMReader;
+use pred::Predecessor;
 
 /// Find MEMs in a graph
 #[derive(Parser, Debug)]
@@ -104,24 +106,6 @@ fn parse_graph(graph: &GFA<usize, ()>) -> (Vec<usize>, Vec<GraphPos>) {
     return (start, result);
 }
 
-trait Predecessor {
-    fn argpred(&self, item: usize) -> usize;
-}
-
-impl Predecessor for Vec<usize> {
-    fn argpred(&self, item: usize) -> usize {
-        let mut l = 0;
-        let mut r = self.len();
-
-        while l < r-1 {
-            let m = (l + r) / 2;
-            if item > self[m] { l = m; }
-            else { r = m; }
-        }
-        return l;
-    }
-}
-
 fn get_graph_positions(
     grammar: &Grammar, mem: &(usize, usize, usize), tag: &[GraphPos], sa: &[usize]
 ) -> Vec<GraphPos> {
@@ -174,7 +158,6 @@ fn lce(grammar: &Grammar, s1: usize, s2: usize) -> (usize, bool) {
     panic!("Incorrect grammar is used.");
 }
 
-use std::collections::HashSet;
 fn list_unique(tag: &[GraphPos]) -> Vec<GraphPos> {
     let mut set: HashSet<GraphPos> = HashSet::new();
     for i in 0..tag.len() { set.insert(tag[i].clone()); }

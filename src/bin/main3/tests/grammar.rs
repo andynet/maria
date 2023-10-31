@@ -1,5 +1,4 @@
 use crate::grammar::Grammar;
-use std::io::{BufReader, BufRead};
 use std::{process::Command, fs::File};
 use std::str;
 use std::io::Write;
@@ -26,17 +25,6 @@ fn test_my_grammar() {
     }
 
     let output = File::create("data/temporary/seq.txt").expect("Cannot create file.");
-    g.print(output);
-}
-
-#[test]
-fn generate_real() {
-    let input = File::open("data/real/SARS-CoV2.5.fnajoin")
-        .expect("Cannot open input file.");
-    let line = BufReader::new(input).lines().next().unwrap().unwrap();
-    let g = Grammar::from_bytes(line.as_bytes());
-    let output = File::create("data/real/SARS-CoV2.5.fnajoin.plainslp")
-        .expect("Cannot open output file");
     g.print(output);
 }
 
