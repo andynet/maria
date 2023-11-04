@@ -67,3 +67,14 @@ fn test_arbitrary() {
     //}
 }
 
+#[test]
+fn test_process_graph() {
+    let (ps1, pn1, ns1, nn1) = process_graph("data/real/SARS-CoV2.5.gfa");
+    let (ps2, pn2, ns2, nn2) = process_graph2("data/real/SARS-CoV2.5.gfa");
+
+    assert_eq!(ps1, ps2); // path_starts
+    assert_eq!(pn1, pn2);
+    assert_eq!(ns1, ns2);
+    assert_eq!(nn1, nn2);
+}
+

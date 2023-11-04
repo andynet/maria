@@ -2,7 +2,7 @@ use std::fmt::Display;
 use std::num::ParseIntError;
 use std::str::FromStr;
 
-#[derive(Clone, Copy, Eq, PartialEq, Hash)]
+#[derive(Clone, Copy, Eq, PartialEq, Hash, Debug)]
 pub enum Direction {
     Forward,
     RevComp
@@ -18,7 +18,7 @@ impl Display for Direction {
     } 
 }
 
-#[derive(Clone, Eq, Hash, PartialEq)]
+#[derive(Clone, Eq, Hash, PartialEq, Debug)]
 pub struct GraphPos {
     pub id: usize,
     pub sign: Direction,

@@ -41,23 +41,19 @@ struct Args {
 fn main() {
     let args = Args::parse();
 
-    let parser: GFAParser<usize, ()> = GFAParser::new();
-    let graph = parser.parse_file(&args.gfa_filename)
-        .expect("Error parsing GFA file.");
-
-    let (start, graph_pos) = parse_graph(&graph);
-    let (path_starts, path_ids) = (
-        vec![0, 29849, 59696, 89512, 119326],
-        vec!["0", "1", "2", "3", "4"]
-    );
+    let (
+        path_starts, path_names,
+        node_starts, node_names
+    ) = process_graph2(&args.gfa_filename);
 
     let pfdata = pfg::pf::PFData::from_graph(&args.gfa_filename, &args.trigger_filename);
 
     let mut sampled_tag = Vec::new();
     let mut sampled_sa = Vec::new();
     for (sa, _, _) in pfdata.iter() {
-        let i = start.argpred(sa);
-        let graph_position = GraphPos{pos: sa - start[i], ..graph_pos[i]};
+        // TODO: sample tag array
+        let i = node_starts.argpred(sa);
+        let graph_position = GraphPos{pos: sa - node_starts[i], ..node_names[i]};
         sampled_tag.push(graph_position);
         sampled_sa.push(sa);
     }
@@ -72,7 +68,7 @@ fn main() {
             );
 
             let i = path_starts.argpred(mem.2);
-            let ref_id = path_ids[i];
+            let ref_id = &path_names[i];
             let pos_in_ref = mem.2 - path_starts[i];
             for gp in graph_positions {
                 println!("{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}",
@@ -82,6 +78,58 @@ fn main() {
             }
         }
     }
+
+}
+
+fn process_graph(filename: &str) -> (Vec<usize>, Vec<String>, Vec<usize>, Vec<GraphPos>) {
+    let parser: GFAParser<usize, ()> = GFAParser::new();
+    let graph = parser.parse_file(filename)
+        .expect("Error parsing GFA file.");
+
+    let (start, graph_pos) = parse_graph(&graph);
+    let (path_starts, path_ids) = (
+        vec![0, 29850, 59697, 89513, 119327],
+        vec![
+            "ENA|MW565758|MW565758.1".to_string(),
+            "ENA|MW565759|MW565759.1".to_string(),
+            "ENA|MW565760|MW565760.1".to_string(),
+            "ENA|MW565761|MW565761.1".to_string(),
+            "ENA|LR883856|LR883856.1".to_string()
+        ]
+    );
+    return (path_starts, path_ids, start, graph_pos);
+}
+
+fn process_graph2(filename: &str) -> (
+    Vec<usize>, Vec<String>, Vec<usize>, Vec<GraphPos>
+) {
+    let parser: GFAParser<usize, ()> = GFAParser::new();
+    let graph = parser.parse_file(filename).expect("Error parsing GFA file.");
+
+    let mut seg_len = HashMap::new();
+    for seg in &graph.segments { seg_len.insert(seg.name, seg.sequence.len()); }
+
+    let mut path_starts = Vec::new();
+    let mut path_names = Vec::new();
+    let mut node_starts = Vec::new();
+    let mut node_names = Vec::new();
+
+    let mut start = 0;
+    for path in &graph.paths {
+        path_starts.push(start);
+        path_names.push(str::from_utf8(&path.path_name).unwrap().to_string());
+
+        let segments: Vec<GraphPos> =
+            str::from_utf8(&path.segment_names).unwrap()
+            .split(',').map(|x| x.parse().unwrap()).collect();
+
+        for node in segments {
+            node_starts.push(start);
+            start += *seg_len.get(&node.id).unwrap();
+            node_names.push(node);
+        }
+    }
+    return (path_starts, path_names, node_starts, node_names);
 }
 
 fn parse_graph(graph: &GFA<usize, ()>) -> (Vec<usize>, Vec<GraphPos>) {
