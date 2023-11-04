@@ -3,6 +3,9 @@ pub trait Predecessor {
 }
 
 impl Predecessor for Vec<usize> {
+    /// Returns index of an element smaller or equal to item
+    /// Assumes self is monotonically increasing and item is larger than at
+    /// least one element of self
     fn argpred(&self, item: usize) -> usize {
         let mut l = 0;
         let mut r = self.len();
@@ -10,7 +13,8 @@ impl Predecessor for Vec<usize> {
         while l < r-1 {
             let m = (l + r) / 2;
             if item > self[m] { l = m; }
-            else { r = m; }
+            else if item < self[m] { r = m; }
+            else { return m; }
         }
         return l;
     }
