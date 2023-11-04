@@ -40,24 +40,14 @@ struct Args {
 
 fn main() {
     let args = Args::parse();
-
-    let (path_starts, path_names, node_starts, node_names) = process_graph2(
-        &args.gfa_filename
-    );
-
-    let (ssa, stag) = get_sampled_arrays(
-        &args.gfa_filename, &args.trigger_filename, &node_starts, &node_names
-    );
-
+    let (path_starts, path_names, node_starts, node_names) = process_graph2(&args.gfa_filename);
+    let (ssa, stag) = get_sampled_arrays(&args.gfa_filename, &args.trigger_filename, &node_starts, &node_names);
     let grammar = Grammar::from_file(&args.grammar_filename);
-
     let mem_reader = MEMReader::new(&args.mems_filename, &args.ptr_filename);
 
     for (read_id, mems) in mem_reader {
         for mem in mems {
-            let graph_positions = get_graph_positions(
-                &grammar, &mem, &stag, &ssa
-            );
+            let graph_positions = get_graph_positions(&grammar, &mem, &stag, &ssa);
 
             let i = path_starts.argpred(mem.2);
             let ref_id = &path_names[i];
@@ -160,22 +150,43 @@ fn parse_graph(graph: &GFA<usize, ()>) -> (Vec<usize>, Vec<GraphPos>) {
     return (start, result);
 }
 
+/// Returns sampled suffix array and sampled tag array.
+/// Both array are sampled at the starts and ends of run boundaries of the tag array.
 fn get_sampled_arrays(
     gfa: &str, triggers: &str, node_starts: &Vec<usize>, node_names: &[GraphPos]
 ) -> (Vec<usize>, Vec<GraphPos>) {
     let pfdata = pfg::pf::PFData::from_graph(gfa, triggers);
+    let mut iterator = pfdata.iter();
 
     let mut sampled_tag = Vec::new();
-    let mut sampled_sa = Vec::new();
-    for (sa, _, _) in pfdata.iter() {
-        // TODO: sample tag array
+    let mut sampled_suf = Vec::new();
+
+    let (sa, _, _) = iterator.next().unwrap();
+    let i = node_starts.argpred(sa);
+    let gp = GraphPos{pos: sa - node_starts[i], ..node_names[i]};
+    sampled_tag.push(gp);
+    sampled_suf.push(sa);
+
+    let mut old_gp = gp;
+    let mut old_sa = sa;
+
+    for (sa, _, _) in iterator {
         let i = node_starts.argpred(sa);
-        let graph_position = GraphPos{pos: sa - node_starts[i], ..node_names[i]};
-        sampled_tag.push(graph_position);
-        sampled_sa.push(sa);
+        let gp = GraphPos{pos: sa - node_starts[i], ..node_names[i]};
+        if old_gp != gp {
+            sampled_tag.push(old_gp);
+            sampled_suf.push(old_sa);
+            sampled_tag.push(gp);
+            sampled_suf.push(sa);
+            old_gp = gp;
+        }
+        old_sa = sa;
     }
 
-    return (sampled_sa, sampled_tag);
+    sampled_tag.push(old_gp);
+    sampled_suf.push(old_sa);
+
+    return (sampled_suf, sampled_tag);
 }
 
 fn get_graph_positions(
