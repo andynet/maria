@@ -41,30 +41,22 @@ struct Args {
 fn main() {
     let args = Args::parse();
 
-    let (
-        path_starts, path_names,
-        node_starts, node_names
-    ) = process_graph2(&args.gfa_filename);
+    let (path_starts, path_names, node_starts, node_names) = process_graph2(
+        &args.gfa_filename
+    );
 
-    let pfdata = pfg::pf::PFData::from_graph(&args.gfa_filename, &args.trigger_filename);
-
-    let mut sampled_tag = Vec::new();
-    let mut sampled_sa = Vec::new();
-    for (sa, _, _) in pfdata.iter() {
-        // TODO: sample tag array
-        let i = node_starts.argpred(sa);
-        let graph_position = GraphPos{pos: sa - node_starts[i], ..node_names[i]};
-        sampled_tag.push(graph_position);
-        sampled_sa.push(sa);
-    }
+    let (ssa, stag) = get_sampled_arrays(
+        &args.gfa_filename, &args.trigger_filename, &node_starts, &node_names
+    );
 
     let grammar = Grammar::from_file(&args.grammar_filename);
 
     let mem_reader = MEMReader::new(&args.mems_filename, &args.ptr_filename);
+
     for (read_id, mems) in mem_reader {
         for mem in mems {
             let graph_positions = get_graph_positions(
-                &grammar, &mem, &sampled_tag, &sampled_sa
+                &grammar, &mem, &stag, &ssa
             );
 
             let i = path_starts.argpred(mem.2);
@@ -74,7 +66,21 @@ fn main() {
                 println!("{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}",
                     read_id, mem.1, ref_id, pos_in_ref, mem.0,
                     gp.id, gp.sign, gp.pos // id, sign, pos
-                )
+                );
+                // println!("{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}",
+                //     read_id,        // string:  Query sequence name
+                //     qlen,           // int:     Query sequence length
+                //     mem.1,          // int:     Query start (0-based; closed)
+                //     mem.1 + mem.0,  // int:     Query end (0-based; open)
+                //     '+',            // char:    Strand relative to the path: "+" or "-"
+                //     path,           // string:  Path matching
+                //     plen,           // int:     Path length
+                //     pstart,         // int:     Start position on the path (0-based; closed)
+                //     pend,           // int:     End position on the path (0-based; open)
+                //     nres,           // int:     Number of residue matches
+                //     alen,           // int:     Alignment block length
+                //     qual            // int:     Mapping quality (0-255; 255 for missing)
+                // );
             }
         }
     }
@@ -152,6 +158,24 @@ fn parse_graph(graph: &GFA<usize, ()>) -> (Vec<usize>, Vec<GraphPos>) {
     }
 
     return (start, result);
+}
+
+fn get_sampled_arrays(
+    gfa: &str, triggers: &str, node_starts: &Vec<usize>, node_names: &[GraphPos]
+) -> (Vec<usize>, Vec<GraphPos>) {
+    let pfdata = pfg::pf::PFData::from_graph(gfa, triggers);
+
+    let mut sampled_tag = Vec::new();
+    let mut sampled_sa = Vec::new();
+    for (sa, _, _) in pfdata.iter() {
+        // TODO: sample tag array
+        let i = node_starts.argpred(sa);
+        let graph_position = GraphPos{pos: sa - node_starts[i], ..node_names[i]};
+        sampled_tag.push(graph_position);
+        sampled_sa.push(sa);
+    }
+
+    return (sampled_sa, sampled_tag);
 }
 
 fn get_graph_positions(
