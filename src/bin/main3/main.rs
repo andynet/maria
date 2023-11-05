@@ -2,10 +2,10 @@ use clap::Parser;
 use gfa::gfa::GFA;
 use gfa::parser::GFAParser;
 use std::collections::HashMap;
-use std::collections::HashSet;
 use std::str;
 use std::usize;
 use pfg;
+use std::iter::zip;
 
 mod gp;
 mod pred;
@@ -47,34 +47,47 @@ fn main() {
 
     for (read_id, mems) in mem_reader {
         for mem in mems {
-            let graph_positions = get_graph_positions(&grammar, &mem, &stag, &ssa);
-
-            let i = path_starts.argpred(mem.2);
-            let ref_id = &path_names[i];
-            let pos_in_ref = mem.2 - path_starts[i];
-            for gp in graph_positions {
-                println!("{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}",
-                    read_id, mem.1, ref_id, pos_in_ref, mem.0,
-                    gp.id, gp.sign, gp.pos // id, sign, pos
+            // this should be let (sa_values, g_positions) = ...
+            let (sa_values, positions) = get_graph_positions(&grammar, &mem, &stag, &ssa);
+            for (sa, _) in zip(sa_values, positions) {
+                let (path, plen, pstart, pend) = extract_path(sa, mem.0, &node_starts, &node_names);
+                println!("{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}",
+                    read_id,        // string:  Query sequence name
+                    mem.0,          // int:     Query sequence length
+                    mem.1,          // int:     Query start (0-based; closed)
+                    mem.1 + mem.0,  // int:     Query end (0-based; open)
+                    '+',            // char:    Strand relative to the path: "+" or "-"
+                    path,           // string:  Path matching
+                    plen,           // int:     Path length
+                    pstart,         // int:     Start position on the path (0-based; closed)
+                    pend,           // int:     End position on the path (0-based; open)
+                    mem.0,          // int:     Number of residue matches
+                    mem.0,          // int:     Alignment block length
+                    60              // int:     Mapping quality (0-255; 255 for missing)
                 );
-                // println!("{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}",
-                //     read_id,        // string:  Query sequence name
-                //     qlen,           // int:     Query sequence length
-                //     mem.1,          // int:     Query start (0-based; closed)
-                //     mem.1 + mem.0,  // int:     Query end (0-based; open)
-                //     '+',            // char:    Strand relative to the path: "+" or "-"
-                //     path,           // string:  Path matching
-                //     plen,           // int:     Path length
-                //     pstart,         // int:     Start position on the path (0-based; closed)
-                //     pend,           // int:     End position on the path (0-based; open)
-                //     nres,           // int:     Number of residue matches
-                //     alen,           // int:     Alignment block length
-                //     qual            // int:     Mapping quality (0-255; 255 for missing)
-                // );
             }
         }
     }
+}
 
+fn extract_path(
+    sa_value: usize, seq_len: usize,
+    node_starts: &Vec<usize>, node_names: &[GraphPos]
+) -> (String, usize, usize, usize) {
+    let mut i = node_starts.argpred(sa_value);
+    let start = node_starts[i];
+
+    let pstart = sa_value - start;
+    let pend = pstart + seq_len;
+
+    let mut path = String::new();
+    while node_starts[i] < start + pend {
+        path.push_str(&node_names[i].to_path());
+        i += 1;
+    }
+    let plen = node_starts[i] - start;
+
+    return (path, plen, pstart, pend);
 }
 
 fn process_graph(filename: &str) -> (Vec<usize>, Vec<String>, Vec<usize>, Vec<GraphPos>) {
@@ -191,11 +204,11 @@ fn get_sampled_arrays(
 
 fn get_graph_positions(
     grammar: &Grammar, mem: &(usize, usize, usize), tag: &[GraphPos], sa: &[usize]
-) -> Vec<GraphPos> {
+) -> (Vec<usize>, Vec<GraphPos>) {
     let lower = get_lower(grammar, mem, sa);          // included
     let upper = get_upper(grammar, mem, sa);          // excluded
 
-    return list_unique(&tag[lower..upper]);
+    return list_unique(&sa[lower..upper], &tag[lower..upper]);
 }
 
 fn get_lower(grammar: &Grammar, mem: &(usize, usize, usize), sa: &[usize]) -> usize {
@@ -241,12 +254,16 @@ fn lce(grammar: &Grammar, s1: usize, s2: usize) -> (usize, bool) {
     panic!("Incorrect grammar is used.");
 }
 
-fn list_unique(tag: &[GraphPos]) -> Vec<GraphPos> {
-    let mut set: HashSet<GraphPos> = HashSet::new();
-    for i in 0..tag.len() { set.insert(tag[i].clone()); }
-    let mut res = Vec::new();
-    for item in set { res.push(item); }
-    return res;
+fn list_unique(sa: &[usize], tag: &[GraphPos]) -> (Vec<usize>, Vec<GraphPos>) {
+    let mut map: HashMap<GraphPos, usize> = HashMap::new();
+    for i in 0..tag.len() { map.insert(tag[i], sa[i]); }
+    let mut suf_uniq = Vec::new();
+    let mut tag_uniq = Vec::new();
+    for (&k, &v) in map.iter() {
+        tag_uniq.push(k);
+        suf_uniq.push(v);
+    }
+    return (suf_uniq, tag_uniq);
 }
 
 #[cfg(test)]

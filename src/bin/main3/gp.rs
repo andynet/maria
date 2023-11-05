@@ -1,4 +1,6 @@
 use std::fmt::Display;
+use std::fmt::Write;
+use std::fmt;
 use std::num::ParseIntError;
 use std::str::FromStr;
 
@@ -9,7 +11,6 @@ pub enum Direction {
     RevComp
 }
 
-use std::fmt;
 impl Display for Direction {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -48,3 +49,14 @@ impl FromStr for GraphPos {
     }
 }
 
+impl GraphPos {
+    pub fn to_path(&self) -> String {
+        let mut repr = String::new();
+        match self.sign {
+            Direction::Forward => { repr.push('>'); },
+            Direction::RevComp => { repr.push('<'); }
+        }
+        write!(&mut repr, "{}", self.id);
+        return repr;
+    }
+}
