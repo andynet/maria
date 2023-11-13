@@ -3,4 +3,4 @@ __pycache__/
 Cargo.lock
 scripts/print_plain_slp
 tools/
-
+/data

@@ -47,13 +47,12 @@ fn main() {
 
     for (read_id, mems) in mem_reader {
         for mem in mems {
-            // this should be let (sa_values, g_positions) = ...
             let (sa_values, positions) = get_graph_positions(&grammar, &mem, &stag, &ssa);
             for (sa, _) in zip(sa_values, positions) {
                 let (path, plen, pstart, pend) = extract_path(sa, mem.0, &node_starts, &node_names);
                 println!("{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}",
                     read_id,        // string:  Query sequence name
-                    mem.0,          // int:     Query sequence length
+                    150,            // int:     Query sequence length
                     mem.1,          // int:     Query start (0-based; closed)
                     mem.1 + mem.0,  // int:     Query end (0-based; open)
                     '+',            // char:    Strand relative to the path: "+" or "-"
