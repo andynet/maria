@@ -1,5 +1,6 @@
 fasta_base := "data/real/SARS-CoV2.5"
 reads_base := "data/real/reads_R1"
+# mamba activate maria
 
 build_graph_from_fasta:
     bgzip -@ 16 -c {{fasta_base}}.fna > {{fasta_base}}.fna.gz
@@ -8,7 +9,7 @@ build_graph_from_fasta:
     sort {{fasta_base}}/*.smooth.final.gfa > {{fasta_base}}.gfa
 
 build_fasta_from_graph:
-    echo "skdgj"
+    gfatk path --all {{fasta_base}}.gfa > {{fasta_base}}.fna
 
 run_moni:
     tools/moni-0.2.0-Linux/bin/moni build -f -r {{fasta_base}}.fna -o {{fasta_base}}
@@ -16,7 +17,6 @@ run_moni:
     tools/moni-0.2.0-Linux/bin/moni mems -i {{fasta_base}} -p {{reads_base}}.fastq -o {{reads_base}}
 
 make_grammar:
-    # mamba activate maria
     less {{fasta_base}}.fna | grep -v "^>" | tr -d "\n" > {{fasta_base}}.fnajoin
     ./tools/bigrepair/bigrepair {{fasta_base}}.fnajoin
     ./scripts/print_plain_slp {{fasta_base}}.fnajoin
@@ -30,12 +30,11 @@ run_maria:
         -p {{reads_base}}.pointers
 
 run_alternative:
-    gfatk path --all $gfa > tmp-genomes.fa
-    bwa index tmp-genomes.fa
-    bwa fastmap tmp-genomes $reads -l 2 > fastmap.out
-    python fastmap2sam.py
-    samtools view -b tmp-sam -o tmp-bam
-    gfainject --gfa tmp-sorted-graph.gfa --bam tmp-bam  > results-mem.gaf
+    bwa index {{fasta_base}}.fna
+    bwa fastmap {{fasta_base}}.fna {{reads_base}}.fastq -l 2 > {{reads_base}}.fastmap
+    python ./scripts/fastmap2sam.py > {{reads_base}}.sam
+    samtools view {{reads_base}}.sam -o {{reads_base}}.bam -b
+    gfainject --gfa {{fasta_base}}.gfa --bam {{reads_base}}.bam  > {{reads_base}}_alternative.gaf
 #
 # cargo run --bin main -- -g data/real/SARS-CoV2.5.gfa -m data/real/reads_R1.mems -p data/real/reads_R1.pointers
 
