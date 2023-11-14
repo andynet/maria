@@ -1,15 +1,25 @@
-fasta_base := "data/real/SARS-CoV2.5"
-reads_base := "data/real/reads_R1"
+fasta_base := "data/2023-11-13_example_run/SARS-CoV2.5"
+reads_base := "data/2023-11-13_example_run/reads_R1"
 # mamba activate maria
 
 build_graph_from_fasta:
     bgzip -@ 16 -c {{fasta_base}}.fna > {{fasta_base}}.fna.gz
     samtools faidx {{fasta_base}}.fna.gz
     pggb -i {{fasta_base}}.fna.gz -n 5 -d tmp -o {{fasta_base}}
-    sort {{fasta_base}}/*.smooth.final.gfa > {{fasta_base}}.gfa
+    sort -k2 -n {{fasta_base}}/*.smooth.final.gfa > {{fasta_base}}.gfa
 
 build_fasta_from_graph:
     gfatk path --all {{fasta_base}}.gfa > {{fasta_base}}.fna
+
+# add_revcomp:
+#     seqtk seq -r {{fasta_base}}.fna | sed "/^>/ s/$/_rev/" > {{fasta_base}}.rev.fna
+#     cat {{fasta_base}}.fna {{fasta_base}}.rev.fna > tmp.fna
+#     mv tmp.fna {{fasta_base}}.fna
+
+revcomp:
+    seqkit seq -i {{fasta_base}}.fna > tmp.fna
+    seqtk seq -r tmp.fna | sed "/^>/ s/$/_rev/" > tmp.rev.fna
+    cat tmp.fna tmp.rev.fna | seqkit sort -w 0 > {{fasta_base}}.fna
 
 run_moni:
     tools/moni-0.2.0-Linux/bin/moni build -f -r {{fasta_base}}.fna -o {{fasta_base}}
@@ -32,9 +42,9 @@ run_maria:
 run_alternative:
     bwa index {{fasta_base}}.fna
     bwa fastmap {{fasta_base}}.fna {{reads_base}}.fastq -l 2 > {{reads_base}}.fastmap
-    python ./scripts/fastmap2sam.py > {{reads_base}}.sam
+    python ./scripts/fastmap2sam.py {{fasta_base}}.fna {{reads_base}}.fastmap > {{reads_base}}.sam
     samtools view {{reads_base}}.sam -o {{reads_base}}.bam -b
-    gfainject --gfa {{fasta_base}}.gfa --bam {{reads_base}}.bam  > {{reads_base}}_alternative.gaf
+    ./tools/gfainject --gfa {{fasta_base}}.gfa --bam {{reads_base}}.bam  > {{reads_base}}_alternative.gaf
 #
 # cargo run --bin main -- -g data/real/SARS-CoV2.5.gfa -m data/real/reads_R1.mems -p data/real/reads_R1.pointers
 

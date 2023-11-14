@@ -1,4 +1,5 @@
 from Bio import SeqIO
+import sys
 
 
 def print_header(fasta: str):
@@ -7,9 +8,8 @@ def print_header(fasta: str):
 
 
 if __name__ == "__main__":
-    fasta = "/home/balaz/projects/maria/data/real/SARS-CoV2.5.fna"
-    reads = "/home/balaz/projects/maria/data/real/reads_R1.fastq"
-    mapping = "/home/balaz/projects/maria/data/real/reads_R1.fastmap"
+    fasta = sys.argv[1]
+    mapping = sys.argv[2]
 
     print_header(fasta)
 
