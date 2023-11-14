@@ -23,8 +23,8 @@ if __name__ == "__main__":
     # RNEXT:    *
     # PNEXT:    0
     # TLEN:     0
-    # SEQ:      TCTTATTTATAGATGGTATCTACCTGAAAGATGTCATTATTTTTCTGAAATCATACTGTTGTTTTCCAACAGATATCTACCCAAGGCCAAAGCCACGCCCTCAACCCCAGCCTGGCAATTCCGGCAACAGTGGAGGTAATGAGTATTTATT
-    # QUAL:     FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF,FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF:FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
+    # SEQ:      *
+    # QUAL:     *
     # TAGS:     NM:i:0	MD:Z:151	AS:i:151	XS:i:0
     with open(mapping) as f:
         lines = f.readlines()
@@ -36,6 +36,8 @@ if __name__ == "__main__":
             (_, qstart, qend, n, rest) = line.split(maxsplit=4)
             for rrecord in rest.split():
                 (rname, rest) = rrecord.split(':')
+                if rname.endswith("_rev"):
+                    continue
                 flag = 0 if rest.startswith("+") else 16
                 pos = rest[1:]
 

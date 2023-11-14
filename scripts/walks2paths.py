@@ -1,11 +1,13 @@
 import sys
 import re
 
+
 def to_pathnode(walknode):
     number = walknode[1:]
-    if walknode[0] == ">": 
+    if walknode[0] == ">":
         return number + "+"
     return number + "-"
+
 
 if __name__ == "__main__":
     if len(sys.argv) != 2:
@@ -17,9 +19,12 @@ if __name__ == "__main__":
         lines = f.readlines()
 
     for line in lines:
-        if line.startswith("H"): print(line, end="")
-        if line.startswith("S"): print(line, end="")
-        if line.startswith("L"): print(line, end="")
+        if line.startswith("H"):
+            print(line, end="")
+        if line.startswith("S"):
+            print(line, end="")
+        if line.startswith("L"):
+            print(line, end="")
         if line.startswith("W"):
             # RecordType SampleId HapIndex SeqId SeqStart SeqEnd Walk
             (_, sample, _, _, _, _, walk) = line.split()
@@ -27,4 +32,3 @@ if __name__ == "__main__":
             walk = list(map(to_pathnode, walk))
             walk = ",".join(walk)
             print(f"P\t{sample}\t{walk}\t*")
-
