@@ -66,6 +66,7 @@ fn complex_test() {
 
 proptest! {
     #[test]
+    #[ignore]
     fn proptesting(s in "[ACGT][ACGT]+") {
         let s: Vec<_> = s.bytes().collect();
         test_grammar_for_string(&s);

@@ -6,11 +6,13 @@ use std::{str, usize};
 
 fn print_table(seq: &[u8], sa: &[usize], tag: &[(Vec<u8>, usize)]) {
     for i in 0..sa.len() {
-        print!("{}\t", sa[i]);
-        print!("{}\t", str::from_utf8(&tag[i].0).unwrap());
-        print!("{}\t", tag[i].1);
-        print!("{}", str::from_utf8(&seq[sa[i]..]).unwrap());
-        print!("{}\n", str::from_utf8(&seq[..sa[i]]).unwrap());
+        println!("{}\t{}\t{}\t{}{}",
+            sa[i],
+            str::from_utf8(&tag[i].0).unwrap(),
+            tag[i].1,
+            str::from_utf8(&seq[sa[i]..]).unwrap(),
+            str::from_utf8(&seq[..sa[i]]).unwrap(),
+        );
     }
 }
 

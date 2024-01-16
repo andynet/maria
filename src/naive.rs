@@ -79,7 +79,7 @@ where
     let mut lengths = Vec::new();
     for p in paths {
         let segments = parse_segments(&p.segment_names);
-        let sequence = get_sequence(&segments, &map);
+        let sequence = get_sequence(&segments, map);
 
         seq.extend_from_slice(&sequence);
         lengths.push(seq.len());
