@@ -1,7 +1,9 @@
-use std::collections::HashMap;
 use std::ops::Index;
 use std::fs::File;
 use std::io::{prelude::*, BufReader};
+
+#[cfg(test)]
+use std::collections::HashMap;
 
 const NTERM: usize = 256;
 
@@ -24,7 +26,6 @@ impl Grammar {
         for line in reader.lines() {
             let line = line.expect("Cannot read line in grammar file.");
             let symbols: Vec<usize> = line
-                .trim()
                 .split_whitespace()
                 .map(|x| x.parse().expect("Cannot parse symbol."))
                 .collect();
@@ -33,14 +34,8 @@ impl Grammar {
             left.push(symbols[0]);
             right.push(symbols[1]);
 
-            let left_size;
-            if symbols[0] < NTERM { left_size = 1; }
-            else { left_size = sizes[symbols[0] - NTERM] }
-
-            let right_size;
-            if symbols[1] < NTERM { right_size = 1; }
-            else { right_size = sizes[symbols[1] - NTERM]; }
-
+            let left_size  = if symbols[0] < NTERM { 1 } else { sizes[symbols[0] - NTERM] };
+            let right_size = if symbols[1] < NTERM { 1 } else { sizes[symbols[1] - NTERM] };
             sizes.push(left_size + right_size);
         }
 
@@ -49,6 +44,7 @@ impl Grammar {
         Grammar { root: left.len() - 1, left, right, sizes, terminals}
     }
 
+    #[cfg(test)]
     pub fn from_bytes(s: &[u8]) -> Self {
         let s: Vec<_> = s.iter().map(|&x| x as usize).collect();
         let mut rule_id: HashMap<(usize, usize), usize> = HashMap::new();
@@ -87,14 +83,8 @@ impl Grammar {
             left.push(l);
             right.push(r);
 
-            let left_size;
-            if l < NTERM { left_size = 1; }
-            else { left_size = sizes[l - NTERM] }
-
-            let right_size;
-            if r < NTERM { right_size = 1; }
-            else { right_size = sizes[r - NTERM]; }
-
+            let left_size = if l < NTERM { 1 } else { sizes[l - NTERM] };
+            let right_size = if r < NTERM { 1 } else { sizes[r - NTERM] };
             sizes.push(left_size + right_size);
         }
 
@@ -103,6 +93,7 @@ impl Grammar {
         Grammar { root: left.len() - 1, left, right, sizes, terminals }
     }
 
+    #[cfg(test)]
     pub fn print<T: Write>(&self, mut output: T) {
         for i in 0..self.left.len() {
             writeln!(output, "{} {}", self.left[i], self.right[i])
@@ -121,9 +112,7 @@ impl Index<usize> for Grammar {
         let mut skipped = 0;
         while symbol >= NTERM {
             let left_symbol = self.left[symbol - NTERM];
-            let left_size;
-            if left_symbol < NTERM { left_size = 1; }
-            else { left_size = self.sizes[left_symbol - NTERM]; }
+            let left_size = if left_symbol < NTERM { 1 } else { self.sizes[left_symbol - NTERM] };
             if skipped + left_size > index {
                 symbol = left_symbol;
             } else {

@@ -1,3 +1,5 @@
+use std::cmp::Ordering;
+
 pub trait Predecessor {
     fn argpred(&self, item: usize) -> usize;
 }
@@ -12,9 +14,11 @@ impl Predecessor for Vec<usize> {
 
         while l < r-1 {
             let m = (l + r) / 2;
-            if item > self[m] { l = m; }
-            else if item < self[m] { r = m; }
-            else { return m; }
+            match item.cmp(&self[m]) {
+                Ordering::Greater => { l = m; },
+                Ordering::Less    => { r = m; },
+                Ordering::Equal   => { return m; },
+            }
         }
         return l;
     }

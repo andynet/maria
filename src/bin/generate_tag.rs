@@ -32,8 +32,7 @@ fn main() {
     let tag = tag_array(&sa, &isa, &gfa.paths, &map);
  
     let mut buffer = BufWriter::new(stdout());
-    let s;
-    if args.print { s = Some(&seq[..]); } else { s = None }
+    let s = if args.print { Some(&seq[..]) } else { None };
 
     write_table(&sa, &tag, s, &mut buffer).expect("Error writting_file");
     buffer.flush().expect("Error writting file.");
@@ -44,15 +43,15 @@ fn write_table(
     output: &mut BufWriter<Stdout>
 ) -> std::io::Result<()> {
     for i in 0..sa.len() {
-        output.write(format!("{}\t", sa[i]).as_bytes())?;
-        output.write(format!("{}\t", str::from_utf8(&tag[i].0).unwrap()).as_bytes())?;
-        output.write(format!("{}\t", tag[i].1).as_bytes())?;
+        output.write_all(format!("{}\t", sa[i]).as_bytes())?;
+        output.write_all(format!("{}\t", str::from_utf8(&tag[i].0).unwrap()).as_bytes())?;
+        output.write_all(format!("{}\t", tag[i].1).as_bytes())?;
 
         if let Some(s) = seq {
-            output.write(format!("{}", str::from_utf8(&s[sa[i]..]).unwrap()).as_bytes())?;
-            output.write(format!("{}", str::from_utf8(&s[..sa[i]]).unwrap()).as_bytes())?;
+            output.write_all(str::from_utf8(&s[sa[i]..]).unwrap().as_bytes())?;
+            output.write_all(str::from_utf8(&s[..sa[i]]).unwrap().as_bytes())?;
         }
-        output.write(b"\n")?;
+        output.write_all(b"\n")?;
     }
     Ok(())
 }

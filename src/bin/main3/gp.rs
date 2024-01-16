@@ -38,25 +38,25 @@ impl FromStr for GraphPos {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let node_id: usize = s[..s.len()-1].parse()?;
-        let direction;
-        match s.bytes().last().ok_or(ParseGraphPosError)? {
-            b'+' => { direction = Direction::Forward; },
-            b'-' => { direction = Direction::RevComp; },
+        let direction = match s.bytes().last().ok_or(ParseGraphPosError)? {
+            b'+' => { Direction::Forward },
+            b'-' => { Direction::RevComp },
             _    => { return Err(ParseGraphPosError); }
-        }
+        };
         let node_pos = 0;
         Ok(GraphPos { id: node_id, sign: direction, pos: node_pos })
     }
 }
 
 impl GraphPos {
-    pub fn to_path(&self) -> String {
+    pub fn to_path(self) -> String {
         let mut repr = String::new();
         match self.sign {
             Direction::Forward => { repr.push('>'); },
             Direction::RevComp => { repr.push('<'); }
         }
-        write!(&mut repr, "{}", self.id);
+        // repr.write_fmt(format_args!("{}", self.id));
+        write!(&mut repr, "{}", self.id).unwrap();
         return repr;
     }
 }

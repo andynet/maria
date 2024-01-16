@@ -1,5 +1,3 @@
-// #![allow(non_snake_case)]
-
 use std::fs::File;
 use std::io::{BufReader, BufRead, Lines};
 
@@ -28,7 +26,7 @@ impl Iterator for MEMReader {
         let id1 = id1.unwrap().expect("Error reading line in MEM.");
         let id2 = id2.unwrap().expect("Error reading line in PTR.");
         if id1 != id2 { panic!("IDs are not the same!\n{id1}\n{id2}") }
-        let id = id1.strip_prefix(">").expect("Id does not start with >").to_owned();
+        let id = id1.strip_prefix('>').expect("Id does not start with >").to_owned();
 
         let mem = self.mem_lines.next()
             .expect("Expected mem line.")
@@ -54,7 +52,7 @@ impl Iterator for MEMReader {
 #[allow(non_snake_case)]
 fn parse_MEM(mem: &str) -> (usize, usize) {
     let mem = &mem[1..mem.len()-1];
-    let v: Vec<usize> = mem.split(",")
+    let v: Vec<usize> = mem.split(',')
         .map(|x| x.parse().expect("Cannot parse MEM."))
         .collect();
     return (v[0], v[1]);

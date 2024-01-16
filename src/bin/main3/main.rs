@@ -1,10 +1,8 @@
 use clap::Parser;
-use gfa::gfa::GFA;
 use gfa::parser::GFAParser;
 use std::collections::HashMap;
 use std::str;
 use std::usize;
-use pfg;
 use std::iter::zip;
 
 mod gp;
@@ -40,7 +38,7 @@ struct Args {
 
 fn main() {
     let args = Args::parse();
-    let (path_starts, path_names, node_starts, node_names) = process_graph2(&args.gfa_filename);
+    let (_, _, node_starts, node_names) = process_graph2(&args.gfa_filename);
     let (ssa, stag) = get_sampled_arrays(&args.gfa_filename, &args.trigger_filename, &node_starts, &node_names);
     let grammar = Grammar::from_file(&args.grammar_filename);
     let mem_reader = MEMReader::new(&args.mems_filename, &args.ptr_filename);
@@ -50,20 +48,22 @@ fn main() {
             let (sa_values, positions) = get_graph_positions(&grammar, &mem, &stag, &ssa);
             for (sa, _) in zip(sa_values, positions) {
                 let (path, plen, pstart, pend) = extract_path(sa, mem.0, &node_starts, &node_names);
-                println!("{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}",
-                    read_id,        // string:  Query sequence name
-                    150,            // int:     Query sequence length
-                    mem.1,          // int:     Query start (0-based; closed)
-                    mem.1 + mem.0,  // int:     Query end (0-based; open)
-                    '+',            // char:    Strand relative to the path: "+" or "-"
-                    path,           // string:  Path matching
-                    plen,           // int:     Path length
-                    pstart,         // int:     Start position on the path (0-based; closed)
-                    pend,           // int:     End position on the path (0-based; open)
-                    mem.0,          // int:     Number of residue matches
-                    mem.0,          // int:     Alignment block length
-                    60              // int:     Mapping quality (0-255; 255 for missing)
-                );
+                #[allow(clippy::print_literal)] {
+                    println!("{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}",
+                        read_id,        // string:  Query sequence name
+                        150,            // int:     Query sequence length
+                        mem.1,          // int:     Query start (0-based; closed)
+                        mem.1 + mem.0,  // int:     Query end (0-based; open)
+                        '+',            // char:    Strand relative to the path: "+" or "-"
+                        path,           // string:  Path matching
+                        plen,           // int:     Path length
+                        pstart,         // int:     Start position on the path (0-based; closed)
+                        pend,           // int:     End position on the path (0-based; open)
+                        mem.0,          // int:     Number of residue matches
+                        mem.0,          // int:     Alignment block length
+                        60              // int:     Mapping quality (0-255; 255 for missing)
+                    );
+                }
             }
         }
     }
@@ -87,25 +87,6 @@ fn extract_path(
     let plen = node_starts[i] - start;
 
     return (path, plen, pstart, pend);
-}
-
-fn process_graph(filename: &str) -> (Vec<usize>, Vec<String>, Vec<usize>, Vec<GraphPos>) {
-    let parser: GFAParser<usize, ()> = GFAParser::new();
-    let graph = parser.parse_file(filename)
-        .expect("Error parsing GFA file.");
-
-    let (start, graph_pos) = parse_graph(&graph);
-    let (path_starts, path_ids) = (
-        vec![0, 29850, 59697, 89513, 119327],
-        vec![
-            "ENA|MW565758|MW565758.1".to_string(),
-            "ENA|MW565759|MW565759.1".to_string(),
-            "ENA|MW565760|MW565760.1".to_string(),
-            "ENA|MW565761|MW565761.1".to_string(),
-            "ENA|LR883856|LR883856.1".to_string()
-        ]
-    );
-    return (path_starts, path_ids, start, graph_pos);
 }
 
 fn process_graph2(filename: &str) -> (
@@ -138,28 +119,6 @@ fn process_graph2(filename: &str) -> (
         }
     }
     return (path_starts, path_names, node_starts, node_names);
-}
-
-fn parse_graph(graph: &GFA<usize, ()>) -> (Vec<usize>, Vec<GraphPos>) {
-    let mut len = HashMap::new();
-    for seg in &graph.segments { len.insert(seg.name, seg.sequence.len()); }
-
-    let mut result = Vec::new();
-    for path in &graph.paths {
-        let p = str::from_utf8(&path.segment_names).unwrap();
-        let p: Vec<GraphPos> = p.split(',').map(|x| x.parse().unwrap()).collect();
-        result.extend_from_slice(&p);
-    }
-
-    let mut start = Vec::new();
-    let mut s = 0;
-    for gp in &result {
-        start.push(s);
-        let id = gp.id;
-        s += *len.get(&id).unwrap();
-    }
-
-    return (start, result);
 }
 
 /// Returns sampled suffix array and sampled tag array.

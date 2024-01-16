@@ -48,3 +48,7 @@ run_alternative:
 #
 # cargo run --bin main -- -g data/real/SARS-CoV2.5.gfa -m data/real/reads_R1.mems -p data/real/reads_R1.pointers
 
+# CARGO_PROFILE_RELEASE_DEBUG=true cargo flamegraph --bin main3 --
+# -f data/2023-11-13_example_run/SARS-CoV2.5.gfa -t data/pftag/triggers.txt
+# -m data/2023-11-13_example_run/reads_R1.mems -p data/2023-11-13_example_run/reads_R1.pointers
+# -g data/2023-11-13_example_run/SARS-CoV2.5.fnajoin.plainslp

@@ -55,6 +55,7 @@ impl From<(Vec<u8>, usize)> for GraphPos {
 struct ParseMEMError;
 
 #[derive(Debug)]
+#[allow(clippy::upper_case_acronyms)]
 struct MEM(usize, usize);
 
 impl FromStr for MEM {
@@ -62,15 +63,9 @@ impl FromStr for MEM {
 
     fn from_str(value: &str) -> Result<Self, Self::Err> {
         let value = &value[1..value.len()-1];
-        let v: Vec<usize> = value.split(",").map(|x| x.parse().expect("Error.")).collect();
+        let v: Vec<usize> = value.split(',').map(|x| x.parse().expect("Error.")).collect();
         Ok(Self(v[0], v[1]))
     }
-}
-
-fn print_tag(tag: &[GraphPos]) {
-    print!("{}: ", tag.len());
-    for i in 0..tag.len() { print!("{} ", tag[i]); }
-    println!();
 }
 
 fn get_sampled_arrays<N, T>(
@@ -80,9 +75,9 @@ where
     N: SegmentId + Clone,
     T: OptFields + Clone
 {
-    let sa  = suffix_array(&seq);
+    let sa  = suffix_array(seq);
     let isa = inverse_suffix_array(&sa);
-    let tag = tag_array(&sa, &isa, &paths, &map);
+    let tag = tag_array(&sa, &isa, paths, map);
 
     let mut tag_sample = Vec::new();
     let mut sa_sample = Vec::new();
@@ -101,9 +96,9 @@ where
     return (tag_sample, sa_sample);
 }
 
-fn list_unique(tag: &[GraphPos]) -> Vec<GraphPos> {
+fn list_unique(tag_array: &[GraphPos]) -> Vec<GraphPos> {
     let mut set: HashSet<GraphPos> = HashSet::new();
-    for i in 0..tag.len() { set.insert(tag[i].clone()); }
+    for tag in tag_array { set.insert(tag.clone()); }
     let mut res = Vec::new();
     for item in set { res.push(item); }
     return res;
@@ -194,7 +189,7 @@ fn main() {
 
     let mut read_id = String::new();
     while b1 != 0 && b2 != 0 {
-        if !mem_line.starts_with(">") {
+        if !mem_line.starts_with('>') {
             let mems: Vec<MEM> = mem_line.split_whitespace()
                 .map(|x| x.parse().expect("Cannot parse MEM")).collect();
             let ptrs: Vec<usize> = ptr_line.split_whitespace()
@@ -205,9 +200,11 @@ fn main() {
                 let mut adj = 0;
                 while lengths[adj] < ptrs[mem.0] { adj += 1; }
                 let ref_mem = (ptrs[mem.0]+adj, mem.1);
-                let ref_pos;
-                if adj != 0 { ref_pos = ptrs[mem.0]+adj-lengths[adj-1]; }
-                else { ref_pos = ptrs[mem.0]; }
+                let ref_pos = if adj != 0 {
+                    ptrs[mem.0]+adj-lengths[adj-1]
+                } else {
+                    ptrs[mem.0] 
+                };
 
                 let gp: Vec<GraphPos> = get_graph_positions(&seq, &ref_mem, &stag, &ssa);
 
@@ -221,7 +218,7 @@ fn main() {
             }
         } else {
             read_id = mem_line.clone();
-            read_id = read_id.strip_prefix(">").unwrap().trim().to_owned();
+            read_id = read_id.strip_prefix('>').unwrap().trim().to_owned();
         }
 
         mem_line.clear();

@@ -31,7 +31,7 @@ fn test_my_grammar() {
 fn test_grammar_for_string(s: &[u8]) {
     {
         let mut out = File::create("data/temporary/seq.txt").expect("Cannot create file.");
-        write!(out, "{}", str::from_utf8(&s).unwrap()).expect("Cannot write to file.");
+        write!(out, "{}", str::from_utf8(s).unwrap()).expect("Cannot write to file.");
     }
 
     println!("Building grammar...");
