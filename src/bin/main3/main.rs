@@ -89,6 +89,16 @@ fn extract_path(
     return (path, plen, pstart, pend);
 }
 
+#[test]
+fn extract_path_correctly_handles_the_end() {
+    let sa_value = 5;
+    let seq_len = 3;
+    let node_starts = vec![0, 10];
+    let node_names = vec![GraphPos::default()];
+
+    extract_path(sa_value, seq_len, &node_starts, &node_names);
+}
+
 fn process_graph2(filename: &str) -> (
     Vec<usize>, Vec<String>, Vec<usize>, Vec<GraphPos>
 ) {
@@ -118,6 +128,7 @@ fn process_graph2(filename: &str) -> (
             node_names.push(node);
         }
     }
+    node_starts.push(start); // sentinel
     return (path_starts, path_names, node_starts, node_names);
 }
 
