@@ -19,6 +19,7 @@ fn parse_graph(graph: &GFA<usize, ()>) -> (Vec<usize>, Vec<GraphPos>) {
         let id = gp.id;
         s += *len.get(&id).unwrap();
     }
+    start.push(s);
 
     return (start, result);
 }

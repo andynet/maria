@@ -17,4 +17,4 @@ fn reverse_complement(s: &[u8]) -> Vec<u8> {
 }
 
 #[cfg(test)]
-mod tests;
+mod tests1;

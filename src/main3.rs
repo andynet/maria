@@ -5,6 +5,7 @@ use std::str;
 use std::usize;
 use std::iter::zip;
 
+mod cli;
 mod gp;
 mod pred;
 mod grammar;

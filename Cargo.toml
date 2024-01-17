@@ -3,6 +3,26 @@ name = "maria"
 version = "0.1.0"
 edition = "2021"
 
+[[bin]]
+name = "main3"
+path = "src/main3.rs"
+
+[[bin]]
+name = "main"
+path = "src/main.rs"
+
+[[bin]]
+name = "generate_tag"
+path = "src/generate_tag.rs"
+
+[[bin]]
+name = "pfp_graph"
+path = "src/pfp_graph.rs"
+
+[[bin]]
+name = "tmp"
+path = "src/tmp.rs"
+
 [dependencies]
 pfg = { git = "https://github.com/andynet/pfg", branch = "main"}
 clap = { version = "4.2.7", features = ["derive"] }
