@@ -67,24 +67,19 @@ fn print_maria_align_noargs_or_help() {
 }
 
 #[derive(Parser, Debug)]
-#[command(
-    override_usage = "\n\
-        maria index <graph>.gfa -t <triggers.txt>\n\
-        maria align <graph>.gfa <reads>.fastq > <output.gaf> \n\
-    ",
-)]
+#[command(override_usage = "\n\
+    maria index <graph>.gfa -t <triggers.txt>\n\
+    maria align <graph>.gfa <reads>.fastq > <output.gaf> \n\
+")]
 pub struct Args {
     #[command(subcommand)]
-    command: Commands,
+    pub command: Commands,
 }
 
 #[derive(Subcommand, Debug)]
-enum Commands {
+pub enum Commands {
     /// Create a run-length compressed tag array <graph>.tag
-    #[command(
-        override_usage = "maria index <GFA> -t <TRIGGERS>",
-        arg_required_else_help = true
-    )]
+    #[command(override_usage = "maria index <GFA> -t <TRIGGERS>", arg_required_else_help = true)]
     Index {
         /// Graph in GFA format
         gfa: String,
@@ -96,12 +91,10 @@ enum Commands {
         #[arg(short = 't', verbatim_doc_comment)]
         triggers: String,
     },
+
     /// Find all positions of a match in a graph.
     /// Matches to the reference can be found by MONI.
-    #[command(
-        override_usage = "maria align <GFA> <READS> > output.gaf",
-        arg_required_else_help = true
-    )]
+    #[command(override_usage = "maria align <GFA> <READS> > output.gaf", arg_required_else_help = true)]
     Align {
         /// Graph in GFA format.
         /// For <graph>.gfa, tag array <graph>.tag and SLP grammar <graph>.slp need to be present.
@@ -113,7 +106,6 @@ enum Commands {
 
         /// Output in GAF format [default: stdout]
         #[arg(short = 'o')]
-        output: Option<String>
+        output: Option<String>,
     },
 }
-

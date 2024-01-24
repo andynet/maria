@@ -24,7 +24,7 @@ fn parse_graph(graph: &GFA<usize, ()>) -> (Vec<usize>, Vec<GraphPos>) {
     return (start, result);
 }
 
-fn process_graph(filename: &str) -> (Vec<usize>, Vec<String>, Vec<usize>, Vec<GraphPos>) {
+fn process_graph_old(filename: &str) -> (Vec<usize>, Vec<String>, Vec<usize>, Vec<GraphPos>) {
     let parser: GFAParser<usize, ()> = GFAParser::new();
     let graph = parser.parse_file(filename)
         .expect("Error parsing GFA file.");
@@ -45,8 +45,8 @@ fn process_graph(filename: &str) -> (Vec<usize>, Vec<String>, Vec<usize>, Vec<Gr
 
 #[test]
 fn test_process_graph() {
-    let (ps1, pn1, ns1, nn1) = process_graph("data/real/SARS-CoV2.5.gfa");
-    let (ps2, pn2, ns2, nn2) = process_graph2("data/real/SARS-CoV2.5.gfa");
+    let (ps1, pn1, ns1, nn1) = process_graph_old("data/real/SARS-CoV2.5.gfa");
+    let (ps2, pn2, ns2, nn2) = process_graph("data/real/SARS-CoV2.5.gfa");
 
     assert_eq!(ps1, ps2); // path_starts
     assert_eq!(pn1, pn2);

@@ -1,6 +1,7 @@
 use std::ops::Index;
 use std::fs::File;
 use std::io::{prelude::*, BufReader};
+use std::path::Path;
 
 #[cfg(test)]
 use std::collections::HashMap;
@@ -16,7 +17,7 @@ pub struct Grammar {
 }
 
 impl Grammar {
-    pub fn from_file(filename: &str) -> Self { 
+    pub fn from_file<P: AsRef<Path> + ?Sized>(filename: &P) -> Self { 
         let file = File::open(filename).expect("Cannot read grammar file.");
         let reader = BufReader::new(file);
 

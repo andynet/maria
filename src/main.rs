@@ -1,266 +1,318 @@
-use gfa::parser::GFAParser;
-use gfa::gfa::{Path, SegmentId};
-use gfa::optfields::*;
-use maria::naive::{create_map,create_sequence,inverse_suffix_array,tag_array};
-use bio::data_structures::suffix_array::suffix_array;
-use std::str;
-use std::str::FromStr;
 use clap::Parser;
-use std::fmt;
+use gfa::parser::GFAParser;
+use core::panic;
+use std::collections::HashMap;
 use std::fs::File;
-use std::io::BufReader;
-use std::io::prelude::*;
-use std::collections::{HashMap, HashSet};
+use std::io::BufWriter;
+use std::io::Write;
+use std::io::stdout;
+use std::path::Path;
+use std::path::PathBuf;
+use std::str;
+use std::usize;
+use std::iter::zip;
 
-/// Find MEMs in a graph
-#[derive(Parser, Debug)]
-#[command(author, version, about)]
-struct Args {
-    /// GFA file
-    #[arg(short)]
-    gfa_filename: String,
-    /// MEMs file
-    #[arg(short)]
-    mems_filename: String,
-    /// pointers
-    #[arg(short)]
-    ptr_filename: String,
-}
+mod cli;
+mod gp;
+mod pred;
+mod grammar;
+mod mem;
 
-#[derive(PartialEq, Eq, Hash, Clone)]
-struct GraphPos {
-    node_id: Vec<u8>,
-    pos: usize,
-}
+use gp::GraphPos as GraphPos;
+use grammar::Grammar;
+use mem::MEMReader;
+use pred::Predecessor;
+use cli::Args;
 
-impl fmt::Display for GraphPos {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "({}, {})", str::from_utf8(&self.node_id).unwrap(), self.pos)
-    }
-}
+fn main() {
+    let args = Args::parse();
 
-impl fmt::Debug for GraphPos {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "({}, {})", str::from_utf8(&self.node_id).unwrap(), self.pos)
-    }
-}
+    match &args.command {
+        cli::Commands::Index { gfa, triggers } => {
+            let gfa = PathBuf::from(gfa);
+            if !gfa.exists() { panic!("File {} does not exist.", gfa.display()); }
+            let triggers = PathBuf::from(triggers);
+            if !triggers.exists() { panic!("File {} does not exist.", triggers.display()); }
 
-impl From<(Vec<u8>, usize)> for GraphPos {
-    fn from(value: (Vec<u8>, usize)) -> Self {
-        GraphPos{ node_id: value.0, pos: value.1 }
-    }
-}
+            let tag = gfa.with_extension("tag");
+            // println!("f: {gfa:?} {triggers:?} -> {tag:?}");
+            create_tag(&gfa, &triggers, &tag)
+        },
+        cli::Commands::Align { gfa, reads, output } => {
+            let gfa = PathBuf::from(gfa);
+            if !gfa.exists() { panic!("File {} does not exist.", gfa.display()); }
+            let tag = gfa.with_extension("tag");
+            if !tag.exists() { panic!(
+                "File {} does not exist. Create it with:\n\n\tmaria index {} -t <triggers.txt>.\n",
+                tag.display(), gfa.display()
+            )}
+            let slp = gfa.with_extension("slp");
+            if !slp.exists() { panic!("File {} does not exist.", slp.display()) }
 
-#[derive(Debug, PartialEq, Eq)]
-struct ParseMEMError;
+            let reads = PathBuf::from(reads);
+            let mems = reads.with_extension("mems");
+            let ptrs = reads.with_extension("pointers");
 
-#[derive(Debug)]
-#[allow(clippy::upper_case_acronyms)]
-struct MEM(usize, usize);
+            if !mems.exists() { panic!("File {} does not exist.", mems.display()) }
+            if !ptrs.exists() { panic!("File {} does not exist.", ptrs.display()) }
 
-impl FromStr for MEM {
-    type Err = ParseMEMError;
-
-    fn from_str(value: &str) -> Result<Self, Self::Err> {
-        let value = &value[1..value.len()-1];
-        let v: Vec<usize> = value.split(',').map(|x| x.parse().expect("Error.")).collect();
-        Ok(Self(v[0], v[1]))
-    }
-}
-
-fn get_sampled_arrays<N, T>(
-    seq: &[u8], paths: &[Path<N, T>], map: &HashMap<Vec<u8>, Vec<u8>>
-) -> (Vec<GraphPos>, Vec<usize>) 
-where
-    N: SegmentId + Clone,
-    T: OptFields + Clone
-{
-    let sa  = suffix_array(seq);
-    let isa = inverse_suffix_array(&sa);
-    let tag = tag_array(&sa, &isa, paths, map);
-
-    let mut tag_sample = Vec::new();
-    let mut sa_sample = Vec::new();
-    tag_sample.push(tag[0].clone().into());
-    sa_sample.push(sa[0]);
-    for i in 1..tag.len() {
-        if tag[i] != tag[i-1] {
-            tag_sample.push(tag[i-1].clone().into());
-            sa_sample.push(sa[i-1]);
-            tag_sample.push(tag[i].clone().into());
-            sa_sample.push(sa[i])
+            // println!("f: {gfa:?} {tag:?} {slp:?} {mems:?} {ptrs:?} -> {output:?}");
+            if let Some(filename) = output {
+                let out = BufWriter::new(
+                    File::create(filename).expect("Cannot create output file.")
+                );
+                align(&gfa, &tag, &slp, &mems, &ptrs, out);
+            } else {
+                let out = stdout().lock();
+                align(&gfa, &tag, &slp, &mems, &ptrs, out);
+            }
         }
     }
-    tag_sample.push(tag[tag.len()-1].clone().into());
-    sa_sample.push(sa[tag.len()-1]);
-    return (tag_sample, sa_sample);
 }
 
-fn list_unique(tag_array: &[GraphPos]) -> Vec<GraphPos> {
-    let mut set: HashSet<GraphPos> = HashSet::new();
-    for tag in tag_array { set.insert(tag.clone()); }
-    let mut res = Vec::new();
-    for item in set { res.push(item); }
+/// f: gfa triggers -> tag
+fn create_tag(gfa: &Path, triggers: &Path, tag: &Path) {
+    println!("Creating tag array {}", tag.display());
+    let (_, _, node_starts, node_names) = process_graph(gfa);
+    let (ssa, stag) = get_sampled_arrays(&gfa, &triggers, &node_starts, &node_names);
+
+    let mut writer: BufWriter<File> = BufWriter::new(File::create(tag)
+        .unwrap_or_else(|_| panic!("Cannot open file {}", tag.display())));
+    for i in 0..ssa.len() {
+        writeln!(writer, "{}\t{}{}:{}", ssa[i],
+            stag[i].id, stag[i].sign, stag[i].pos // implement Display for tag?
+        ).expect("Error while writing tags.");
+    }
+    writer.flush().expect("Error writing.");
+    println!("Tag array successfully created.");
+}
+
+/// f: gfa tag slp mems ptrs -> output
+fn align<T>(
+    gfa: &Path, tag: &Path, grammar: &Path, mems: &Path, ptrs: &Path, mut output: T
+) where
+    T: Write
+{
+    let (_, _, node_starts, node_names) = process_graph(gfa);
+    let (ssa, stag) = read_tag_array(tag);
+    let grammar = Grammar::from_file(grammar);
+    let mem_reader = MEMReader::new(mems, ptrs);
+
+    for (read_id, mems) in mem_reader {
+        for mem in mems {
+            let (sa_values, positions) = get_graph_positions(&grammar, &mem, &stag, &ssa);
+            for (sa, _) in zip(sa_values, positions) {
+                let (path, plen, pstart, pend) = extract_path(sa, mem.0, &node_starts, &node_names);
+                #[allow(clippy::write_literal)] {
+                    writeln!(output, "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}",
+                        read_id,        // string:  Query sequence name
+                        150,            // int:     Query sequence length
+                        mem.1,          // int:     Query start (0-based; closed)
+                        mem.1 + mem.0,  // int:     Query end (0-based; open)
+                        '+',            // char:    Strand relative to the path: "+" or "-"
+                        path,           // string:  Path matching
+                        plen,           // int:     Path length
+                        pstart,         // int:     Start position on the path (0-based; closed)
+                        pend,           // int:     End position on the path (0-based; open)
+                        mem.0,          // int:     Number of residue matches
+                        mem.0,          // int:     Alignment block length
+                        60              // int:     Mapping quality (0-255; 255 for missing)
+                    ).expect("Error writing output");
+                }
+            }
+        }
+    }
+}
+
+// fn get_output(output: Option<String>) -> impl Write {
+//     if let Some(x) = output {
+//         return File::create(x).unwrap();
+//     }
+//     // let output = match output {
+//     //     None => stdout(),
+//     //     Some(name) => File::create(name),
+//     // };
+//     return stdout();
+// }
+
+fn read_tag_array(tag: &Path) -> (Vec<usize>, Vec<GraphPos>) {
+    use std::fs::read_to_string;
+    let res: (Vec<_>, Vec<_>) = read_to_string(tag).unwrap().lines().map(|line| {
+        let z: Vec<_> = line.split('\t').collect();
+        if z.len() != 2 { panic!("Tag array line {line} is incorrect.") }
+        let sa_value: usize = z[0].parse().unwrap();
+        let tag_value: GraphPos = z[1].parse().unwrap();
+        (sa_value, tag_value)
+    }).unzip();
     return res;
 }
 
-/// returns (l, f) such that: 
-/// seq[s1..s1+l] == seq[s2..s2+l]
-/// if seq[s1+l] < seq[s2+l]: f = True
-fn lce(seq: &[u8], s1: usize, s2: usize) -> (usize, bool) {
-    let n = seq.len();
-    if s1 == s2 { return (n-s1, false); }    // the same is not smaller
+fn extract_path(
+    sa_value: usize, seq_len: usize,
+    node_starts: &Vec<usize>, node_names: &[GraphPos]
+) -> (String, usize, usize, usize) {
+    let mut i = node_starts.argpred(sa_value);
+    let start = node_starts[i];
 
-    let mut l = 0;
-    while s1+l < n && s2+l < n && seq[s1+l] == seq[s2+l] { l += 1; }
-    if s1+l == n { return (l, true); }
-    if s2+l == n { return (l, false); }
-    if seq[s1+l] < seq[s2+l] { return (l, true); }
-    if seq[s1+l] > seq[s2+l] { return (l, false); }
-    panic!();
+    let pstart = sa_value - start;
+    let pend = pstart + seq_len;
+
+    let mut path = String::new();
+    while node_starts[i] < start + pend {
+        path.push_str(&node_names[i].to_path());
+        i += 1;
+    }
+    let plen = node_starts[i] - start;
+
+    return (path, plen, pstart, pend);
 }
 
-fn get_lower(seq: &[u8], mem: &(usize, usize), sa: &[usize]) -> usize {
+#[test]
+fn extract_path_correctly_handles_the_end() {
+    let sa_value = 5;
+    let seq_len = 3;
+    let node_starts = vec![0, 10];
+    let node_names = vec![GraphPos::default()];
+
+    extract_path(sa_value, seq_len, &node_starts, &node_names);
+}
+
+fn process_graph<P: AsRef<Path>>(filename: P) -> (
+    Vec<usize>, Vec<String>, Vec<usize>, Vec<GraphPos>
+) {
+    let parser: GFAParser<usize, ()> = GFAParser::new();
+    let graph = parser.parse_file(filename).expect("Error parsing GFA file.");
+
+    let mut seg_len = HashMap::new();
+    for seg in &graph.segments { seg_len.insert(seg.name, seg.sequence.len()); }
+
+    let mut path_starts = Vec::new();
+    let mut path_names = Vec::new();
+    let mut node_starts = Vec::new();
+    let mut node_names = Vec::new();
+
+    let mut start = 0;
+    for path in &graph.paths {
+        path_starts.push(start);
+        path_names.push(str::from_utf8(&path.path_name).unwrap().to_string());
+
+        let segments: Vec<GraphPos> =
+            str::from_utf8(&path.segment_names).unwrap()
+            .split(',').map(|x| x.parse().unwrap()).collect();
+
+        for node in segments {
+            node_starts.push(start);
+            start += *seg_len.get(&node.id).unwrap();
+            node_names.push(node);
+        }
+    }
+    node_starts.push(start); // sentinel
+    return (path_starts, path_names, node_starts, node_names);
+}
+
+/// Returns sampled suffix array and sampled tag array.
+/// Both array are sampled at the starts and ends of run boundaries of the tag array.
+fn get_sampled_arrays<P: AsRef<Path>>(
+    gfa: P, triggers: P, node_starts: &Vec<usize>, node_names: &[GraphPos]
+) -> (Vec<usize>, Vec<GraphPos>) {
+    let pfdata = pfg::pf::PFData::from_graph(gfa.as_ref().to_str().unwrap(), triggers.as_ref().to_str().unwrap());
+    let mut iterator = pfdata.iter();
+
+    let mut sampled_tag = Vec::new();
+    let mut sampled_suf = Vec::new();
+
+    let (sa, _, _) = iterator.next().unwrap();
+    let i = node_starts.argpred(sa);
+    let gp = GraphPos{pos: sa - node_starts[i], ..node_names[i]};
+    sampled_tag.push(gp);
+    sampled_suf.push(sa);
+
+    let mut old_gp = gp;
+    let mut old_sa = sa;
+
+    for (sa, _, _) in iterator {
+        let i = node_starts.argpred(sa);
+        let gp = GraphPos{pos: sa - node_starts[i], ..node_names[i]};
+        if old_gp != gp {
+            sampled_tag.push(old_gp);
+            sampled_suf.push(old_sa);
+            sampled_tag.push(gp);
+            sampled_suf.push(sa);
+            old_gp = gp;
+        }
+        old_sa = sa;
+    }
+
+    sampled_tag.push(old_gp);
+    sampled_suf.push(old_sa);
+
+    return (sampled_suf, sampled_tag);
+}
+
+fn get_graph_positions(
+    grammar: &Grammar, mem: &(usize, usize, usize), tag: &[GraphPos], sa: &[usize]
+) -> (Vec<usize>, Vec<GraphPos>) {
+    let lower = get_lower(grammar, mem, sa);          // included
+    let upper = get_upper(grammar, mem, sa);          // excluded
+
+    return list_unique(&sa[lower..upper], &tag[lower..upper]);
+}
+
+fn get_lower(grammar: &Grammar, mem: &(usize, usize, usize), sa: &[usize]) -> usize {
     let mut l = 0;
     let mut r = sa.len();
 
     while l < r-1 {
         let m = (l + r) / 2;
-        let (e, sa_smaller) = lce(seq, sa[m], mem.0);
-        if e < mem.1 && sa_smaller { l = m; }
+        let (e, sa_smaller) = lce(grammar, sa[m], mem.2);
+        if e < mem.0 && sa_smaller { l = m; }
         else { r = m; }
     }
     return r;
 }
 
-fn get_upper(seq: &[u8], mem: &(usize, usize), sa: &[usize]) -> usize {
+fn get_upper(grammar: &Grammar, mem: &(usize, usize, usize), sa: &[usize]) -> usize {
     let mut l = 0;
     let mut r = sa.len();
 
     while l < r-1 {
         let m = (l + r) / 2;
-        let (e, sa_smaller) = lce(seq, sa[m], mem.0);
-        if e < mem.1 && !sa_smaller { r = m; }
+        let (e, sa_smaller) = lce(grammar, sa[m], mem.2);
+        if e < mem.0 && !sa_smaller { r = m; }
         else { l = m; }
     }
 
     return r;
 }
 
-fn get_graph_positions(seq: &[u8], mem: &(usize, usize), tag: &[GraphPos], sa: &[usize]) -> Vec<GraphPos> {
-    let lower = get_lower(seq, mem, sa);          // included
-    let upper = get_upper(seq, mem, sa);          // excluded
+/// returns (l, f) such that: 
+/// seq[s1..s1+l] == seq[s2..s2+l]
+/// if seq[s1+l] < seq[s2+l]: f = True
+fn lce(grammar: &Grammar, s1: usize, s2: usize) -> (usize, bool) {
+    let n = grammar.len();
+    if s1 == s2 { return (n-s1, false); }    // the same is not smaller
 
-    return list_unique(&tag[lower..upper]);
+    let mut l = 0;
+    while s1+l < n && s2+l < n && grammar[s1+l] == grammar[s2+l] { l += 1; }
+    if s1+l == n { return (l, true); }
+    if s2+l == n { return (l, false); }
+    if grammar[s1+l] < grammar[s2+l] { return (l, true); }
+    if grammar[s1+l] > grammar[s2+l] { return (l, false); }
+    panic!("Incorrect grammar is used.");
 }
 
-fn parse_node_id(node_id: Vec<u8>) -> (String, char) {
-    let n = node_id.len();
-    let id = str::from_utf8(&node_id[0..n-1]).unwrap().to_owned();
-    let sign = node_id[n-1] as char;
-    return (id, sign);
-}
-
-fn main() {
-    // <read_id> <read_pos> <ref_id> <ref_pos> <len> <node> <node_sign> <node_pos>
-    let args = Args::parse();
-
-    let parser: GFAParser<Vec<u8>, Vec<OptField>> = GFAParser::new();
-    let gfa = parser.parse_file(&args.gfa_filename).expect("Error parsing file.");
-
-    let map = create_map(&gfa.segments);
-    let (seq, lengths) = create_sequence(&gfa.paths, &map); 
-    // ^- This is a problem, because it is linear size.
-    // How to get rid of it?
-
-    let (stag, ssa) = get_sampled_arrays(&seq, &gfa.paths, &map);
-
-    let mem_file = File::open(&args.mems_filename).expect("Cannot open MEM file.");
-    let ptr_file = File::open(&args.ptr_filename).expect("Cannot open PTR file.");
-
-    let mut mem_reader = BufReader::new(mem_file);
-    let mut ptr_reader = BufReader::new(ptr_file);
-
-    let mut mem_line = String::new();
-    let mut ptr_line = String::new();
-
-    let mut b1 = mem_reader.read_line(&mut mem_line).expect("Cannot read mem line.");
-    let mut b2 = ptr_reader.read_line(&mut ptr_line).expect("Cannot read ptr line.");
-
-    let mut read_id = String::new();
-    while b1 != 0 && b2 != 0 {
-        if !mem_line.starts_with('>') {
-            let mems: Vec<MEM> = mem_line.split_whitespace()
-                .map(|x| x.parse().expect("Cannot parse MEM")).collect();
-            let ptrs: Vec<usize> = ptr_line.split_whitespace()
-                .map(|x| x.parse().expect("Cannot parse PTR")).collect();
-
-            for mem in &mems {
-                // ads +1 for every $ inserted to seq
-                let mut adj = 0;
-                while lengths[adj] < ptrs[mem.0] { adj += 1; }
-                let ref_mem = (ptrs[mem.0]+adj, mem.1);
-                let ref_pos = if adj != 0 {
-                    ptrs[mem.0]+adj-lengths[adj-1]
-                } else {
-                    ptrs[mem.0] 
-                };
-
-                let gp: Vec<GraphPos> = get_graph_positions(&seq, &ref_mem, &stag, &ssa);
-
-                for gpos in gp {
-                    let (node_id, sign): (String, char) = parse_node_id(gpos.node_id);
-                    println!("{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}",
-                        read_id, mem.0, adj, ref_pos, mem.1, node_id, sign, gpos.pos
-                    )
-                }
-
-            }
-        } else {
-            read_id = mem_line.clone();
-            read_id = read_id.strip_prefix('>').unwrap().trim().to_owned();
-        }
-
-        mem_line.clear();
-        ptr_line.clear();
-
-        b1 = mem_reader.read_line(&mut mem_line).expect("Cannot read mem line.");
-        b2 = ptr_reader.read_line(&mut ptr_line).expect("Cannot read ptr line.");
+fn list_unique(sa: &[usize], tag: &[GraphPos]) -> (Vec<usize>, Vec<GraphPos>) {
+    let mut map: HashMap<GraphPos, usize> = HashMap::new();
+    for i in 0..tag.len() { map.insert(tag[i], sa[i]); }
+    let mut suf_uniq = Vec::new();
+    let mut tag_uniq = Vec::new();
+    for (&k, &v) in map.iter() {
+        tag_uniq.push(k);
+        suf_uniq.push(v);
     }
+    return (suf_uniq, tag_uniq);
 }
-
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_lce() {
-        let seq = b"AAAAAAAAAA$";
-        assert_eq!(lce(seq, 0, 5), (5, false));
-        let seq = b"AAAA$AAAA$";
-        assert_eq!(lce(seq, 0, 5), (5, false));
-        let seq = b"AGCTGCTGCTTGATGCTGATCG$";
-        assert_eq!(lce(seq, 1, 4), (6, true));
-        assert_eq!(lce(seq, 0, 0), (23, false));
-    }
-
-    #[test]
-    fn test_binsearch() {
-        let seq = b"AGGTTAGTAC$AGTAACGTTAAC$";
-        let sa = suffix_array(seq);
-
-        let mem = (17, 2);
-        let expected_result = (14, 18);
-        let lower = get_lower(seq, &mem, &sa);
-        let upper = get_upper(seq, &mem, &sa);
-        assert_eq!((lower, upper), expected_result);
-
-        let mem = (11, 2);
-        let expected_result = (7, 10);
-        let lower = get_lower(seq, &mem, &sa);
-        let upper = get_upper(seq, &mem, &sa);
-        assert_eq!((lower, upper), expected_result);
-    }
-}
+mod tests;
 

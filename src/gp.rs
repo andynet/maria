@@ -20,6 +20,17 @@ impl Display for Direction {
     } 
 }
 
+impl FromStr for Direction {
+    type Err = ParseGraphPosError;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "+" => { Ok(Direction::Forward) },
+            "-" => { Ok(Direction::RevComp) },
+            _   => { Err(ParseGraphPosError) }
+        }
+    }
+}
+
 #[derive(Clone, Eq, Hash, PartialEq, Debug, Default, Copy)]
 pub struct GraphPos {
     pub id: usize,
@@ -37,15 +48,54 @@ impl FromStr for GraphPos {
     type Err = ParseGraphPosError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let node_id: usize = s[..s.len()-1].parse()?;
-        let direction = match s.bytes().last().ok_or(ParseGraphPosError)? {
-            b'+' => { Direction::Forward },
-            b'-' => { Direction::RevComp },
-            _    => { return Err(ParseGraphPosError); }
-        };
-        let node_pos = 0;
-        Ok(GraphPos { id: node_id, sign: direction, pos: node_pos })
+        let (input, gp) = alt((Self::parse_graphpos, Self::parse_graphpos_incomplete))(s)
+            .map_err(|_| ParseGraphPosError)?;
+        if !input.is_empty() { return Err(ParseGraphPosError); }
+        Ok(gp)
     }
+
+}
+
+use nom::branch::alt;
+use nom::character::complete::digit1;
+use nom::character::complete::one_of;
+use nom::bytes::complete::tag;
+use nom::IResult;
+impl GraphPos {
+    fn parse_graphpos(input: &str) -> IResult<&str, Self> {
+        let (input, id) = digit1(input)?;
+        let (input, sign) = one_of("+-")(input)?;
+        let (input, _) = tag(":")(input)?;
+        let (input, pos) = digit1(input)?;
+        let gp = GraphPos{
+            // these unwraps are safe because of nom
+            id   : id.parse().unwrap(),
+            sign : sign.to_string().parse().unwrap(),
+            pos  : pos.parse().unwrap()
+        };
+        return Ok((input, gp));
+    }
+
+    fn parse_graphpos_incomplete(input: &str) -> IResult<&str, Self> {
+        let (input, id) = digit1(input)?;
+        let (input, sign) = one_of("+-")(input)?;
+        let gp = GraphPos{
+            id : id.parse().unwrap(),
+            sign: sign.to_string().parse().unwrap(),
+            pos: 0,
+        };
+        return Ok((input, gp));
+    }
+}
+
+#[test]
+fn can_parse_graph_pos() {
+    let gp: GraphPos = "10+".parse().unwrap();
+    assert_eq!(gp, GraphPos{id: 10, sign: Direction::Forward, pos: 0});
+    let gp: GraphPos = "10+:5".parse().unwrap();
+    assert_eq!(gp, GraphPos{id: 10, sign: Direction::Forward, pos: 5});
+    let gp = "10+:".parse::<GraphPos>();
+    assert!(gp.is_err());
 }
 
 impl GraphPos {
@@ -55,7 +105,6 @@ impl GraphPos {
             Direction::Forward => { repr.push('>'); },
             Direction::RevComp => { repr.push('<'); }
         }
-        // repr.write_fmt(format_args!("{}", self.id));
         write!(&mut repr, "{}", self.id).unwrap();
         return repr;
     }

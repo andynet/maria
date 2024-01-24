@@ -1,4 +1,5 @@
 use std::fs::File;
+use std::path::Path;
 use std::io::{BufReader, BufRead, Lines};
 
 pub struct MEMReader {
@@ -7,7 +8,7 @@ pub struct MEMReader {
 }
 
 impl MEMReader {
-    pub fn new(mems_filename: &str, ptrs_filename: &str) -> Self {
+    pub fn new<P: AsRef<Path> + ?Sized>(mems_filename: &P, ptrs_filename: &P) -> Self {
         let mem_lines = BufReader::new(File::open(mems_filename).expect("Cannot open MEM file.")).lines();
         let ptr_lines = BufReader::new(File::open(ptrs_filename).expect("Cannot open PTR file.")).lines();
 
